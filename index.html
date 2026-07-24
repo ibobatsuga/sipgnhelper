@@ -292,10 +292,11 @@
         color: #94a3b8;
     }
 
-    /* Dashboard Top Pastel Cards Grid (Matching Reference Mockup Image) */
+    /* Dashboard Top Pastel Cards Grid (Matching Reference Mockup Bento Box Layout) */
     .dash-top-grid {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
+        grid-template-rows: repeat(2, 1fr);
         gap: 16px;
         margin-bottom: 24px;
     }
@@ -303,6 +304,11 @@
     @media (max-width: 1200px) {
         .dash-top-grid {
             grid-template-columns: repeat(2, 1fr);
+            grid-template-rows: auto;
+        }
+        .dash-hero-teal {
+            grid-column: span 2 !important;
+            grid-row: span 1 !important;
         }
     }
 
@@ -312,7 +318,8 @@
         display: flex;
         flex-direction: column;
         justify-content: space-between;
-        min-height: 130px;
+        min-height: 135px;
+        height: 100%;
         box-shadow: 0 4px 12px rgba(0,0,0,0.015);
         transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
@@ -387,13 +394,15 @@
     }
     .text-cyan { color: #0e7490; }
 
-    /* Teal Hero Widget (Matching Mockup Image Large Teal Container) */
+    /* Teal Hero Widget (2x Height Spanning 2 Rows Aligned Top and Bottom) */
     .dash-hero-teal {
-        grid-column: span 2;
+        grid-column: 3 / span 2;
+        grid-row: 1 / span 2;
+        height: 100%;
         background: linear-gradient(135deg, #0d9488, #0f766e);
         color: #ffffff;
         border-radius: 18px;
-        padding: 22px;
+        padding: 24px;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
@@ -1236,7 +1245,7 @@
         <div class="dash-card-sub text-green">Total Pengeluaran Terverifikasi</div>
       </div>
 
-      <!-- Teal Hero Chart Banner (Matching Teal Box in Mockup Image) -->
+      <!-- Teal Hero Chart Banner (2x Height Spanning 2 Rows) -->
       <div class="dash-hero-teal">
         <div class="hero-header">
           <div>
@@ -1245,7 +1254,10 @@
           </div>
           <span class="hero-badge-pill">Periode Berjalan</span>
         </div>
-        <div class="hero-bars-visual">
+        <div style="margin: 14px 0 6px 0; font-size: 12px; opacity: 0.9; line-height: 1.6;">
+          Statistik pengadaan bahan baku, transaksi operasional &amp; sinkronisasi laporan otomatis SPPG.
+        </div>
+        <div class="hero-bars-visual" style="height: 64px;">
           <div class="bar-col" style="height: 40%"></div>
           <div class="bar-col" style="height: 65%"></div>
           <div class="bar-col active" style="height: 85%"></div>
