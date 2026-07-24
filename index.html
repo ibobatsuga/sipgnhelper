@@ -1535,24 +1535,115 @@
         save('transaksi'); render();
     }
 
-    // ---------- OCR STRUK (TIM) ----------
+    // ---------- OCR STRUK & IMPORT (TIM) ----------
     function renderOcr() {
         const s = DB.setup;
         return `
   <div class="card">
-    <h2>OCR Struk</h2>
-    <p class="sub">Foto struk, AI baca otomatis, tim bisa kirim dari HP masing-masing.</p>
+    <h2>OCR Struk &amp; Import Data Belanja</h2>
+    <p class="sub">Foto struk (baca otomatis AI) atau unggah file Excel / CSV berisi daftar pengeluaran belanja.</p>
     <div class="grid c2">
-      <div class="field"><label>Nama Kamu</label><input id="ocrq_nama" value="${s.namaPengirimDefault || ''}" placeholder="cth: Budi (Gudang)"></div>
+      <div class="field"><label>Nama Kamu / Pengirim</label><input id="ocrq_nama" value="${s.namaPengirimDefault || ''}" placeholder="cth: Budi (Gudang)"></div>
       <div class="field"><label>Foto Struk/Nota</label><input type="file" id="ocrq_file" accept="image/*" capture="environment"></div>
     </div>
-    <button class="btn btn-gold" id="ocrq_btn" onclick="submitOcrQueue()">📷 Baca &amp; Kirim</button>
+    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:10px; align-items:center;">
+      <button class="btn btn-gold" id="ocrq_btn" onclick="submitOcrQueue()">📷 Baca &amp; Kirim Struk</button>
+      <label class="btn btn-outline" style="cursor:pointer; margin:0; font-weight:700;">
+        📊 Upload File Excel / CSV
+        <input type="file" id="excel_csv_file" accept=".csv, .xlsx, .xls, text/csv" style="display:none;" onchange="handleExcelCsvUpload(event)">
+      </label>
+    </div>
   </div>
   <div class="card">
-    <h2>Antrean</h2>
+    <h2>Antrean Struk &amp; Import</h2>
     <div id="ocrQueueList" class="empty">Memuat...</div>
   </div>
   `;
+    }
+
+    function handleExcelCsvUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const fileName = file.name;
+        const reader = new FileReader();
+
+        reader.onload = async function(e) {
+            try {
+                const content = e.target.result;
+                const lines = content.split(/\r?\n/).filter(line => line.trim() !== '');
+                if (lines.length < 2) {
+                    toast('File kosong atau hanya berisi baris header');
+                    return;
+                }
+
+                // Determine delimiter
+                const firstLine = lines[0];
+                const delimiter = firstLine.includes(';') ? ';' : firstLine.includes('\t') ? '\t' : ',';
+                const headers = firstLine.split(delimiter).map(h => h.trim().replace(/^"|"$/g, '').toLowerCase());
+
+                let importedCount = 0;
+                await loadOcrQueue();
+
+                for (let i = 1; i < lines.length; i++) {
+                    const cols = lines[i].split(delimiter).map(c => c.trim().replace(/^"|"$/g, ''));
+                    if (cols.length === 0 || cols.every(c => c === '')) continue;
+
+                    let tgl = todayStr();
+                    let vendor = 'Import Excel/CSV';
+                    let namaBarang = 'Barang';
+                    let jumlah = 1;
+                    let harga = 0;
+                    let total = 0;
+
+                    headers.forEach((h, idx) => {
+                        const val = cols[idx] || '';
+                        if (h.includes('tgl') || h.includes('tanggal') || h.includes('date')) {
+                            if (val) tgl = val;
+                        } else if (h.includes('vendor') || h.includes('pemasok') || h.includes('toko') || h.includes('supplier')) {
+                            if (val) vendor = val;
+                        } else if (h.includes('barang') || h.includes('item') || h.includes('nama') || h.includes('uraian') || h.includes('deskripsi')) {
+                            if (val) namaBarang = val;
+                        } else if (h.includes('harga') || h.includes('price')) {
+                            harga = Number(val.replace(/[^0-9.-]+/g, '')) || 0;
+                        } else if (h.includes('jumlah') || h.includes('qty') || h.includes('quantity')) {
+                            jumlah = Number(val.replace(/[^0-9.-]+/g, '')) || 1;
+                        } else if (h.includes('total') || h.includes('jumlah total') || h.includes('subtotal') || h.includes('nominal')) {
+                            total = Number(val.replace(/[^0-9.-]+/g, '')) || 0;
+                        }
+                    });
+
+                    if (!total && harga) total = harga * jumlah;
+                    if (!harga && total && jumlah) harga = Math.round(total / jumlah);
+                    if (total <= 0 && harga <= 0) continue;
+
+                    ocrQueueCache.push({
+                        id: uid(),
+                        submittedBy: 'Import CSV (' + fileName + ')',
+                        tanggalKirim: todayStr(),
+                        status: 'baru',
+                        extracted: {
+                            tanggal: tgl,
+                            vendor: vendor,
+                            items: [{ nama: namaBarang, jumlah: jumlah, harga: harga }],
+                            total: total
+                        }
+                    });
+                    importedCount++;
+                }
+
+                await saveOcrQueue();
+                toast(`Berhasil mengimpor ${importedCount} data dari ${fileName}!`);
+                const el = document.getElementById('ocrQueueList');
+                if (el) el.innerHTML = renderOcrQueueListHtml();
+                event.target.value = '';
+            } catch (err) {
+                console.error(err);
+                toast('Gagal membaca file CSV/Excel — pastikan format file valid');
+            }
+        };
+
+        reader.readAsText(file);
     }
     function renderOcrQueueListHtml() {
         const pending = ocrQueueCache.filter(o => o.status === 'baru').slice().reverse();
