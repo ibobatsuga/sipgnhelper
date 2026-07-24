@@ -5,24 +5,31 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SIPGN &amp; Laporan Keuangan SPPG — Sistem Terpadu</title>
     <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
     :root {
+        --font-main: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+        --bg-app: #f8fafc;
+        --sidebar-bg: #ffffff;
+        --border-color: #e2e8f0;
+        --text-main: #0f172a;
+        --text-muted: #64748b;
+
         --navy: #0e2a5e;
         --navy-dark: #0a1d40;
-        --navy-light: #1c3f7d;
         --gold: #c9a227;
         --gold-light: #e8c96a;
-        --bg: #f3f5f9;
+        --line: #e2e8f0;
         --card: #ffffff;
-        --line: #e1e6ef;
-        --ink: #1a2333;
-        --muted: #5b6577;
-        --ok: #1a8a4a;
-        --ok-bg: #e6f7ec;
-        --warn: #b45309;
-        --warn-bg: #fef3e0;
-        --bad: #b91c1c;
-        --bad-bg: #fdeaea;
-        font-family: 'Segoe UI', Arial, sans-serif;
+        --ink: #0f172a;
+        --muted: #64748b;
+
+        --ok: #16a34a;
+        --ok-bg: #dcfce7;
+        --warn: #d97706;
+        --warn-bg: #fef3c7;
+        --bad: #dc2626;
+        --bad-bg: #fee2e2;
     }
 
     * {
@@ -31,265 +38,629 @@
 
     body {
         margin: 0;
-        color: var(--ink);
-        background: var(--bg);
+        padding: 0;
+        font-family: var(--font-main);
+        background-color: var(--bg-app);
+        color: var(--text-main);
+        -webkit-font-smoothing: antialiased;
     }
 
-    .app {
-        max-width: 1180px;
-        margin: 0 auto;
-    }
-
-    .topbar {
-        background: linear-gradient(135deg, var(--navy-dark), var(--navy));
-        color: #fff;
-        padding: 18px 22px;
-        border-radius: 10px 10px 0 0;
-    }
-
-    .topbar h1 {
-        margin: 0;
-        font-size: 19px;
-        letter-spacing: .2px;
-    }
-
-    .topbar p {
-        margin: 4px 0 0;
-        font-size: 12.5px;
-        color: #cfe0ff;
-    }
-
-    .tabs {
+    .app-layout {
         display: flex;
-        flex-wrap: wrap;
-        gap: 4px;
-        background: var(--navy-dark);
-        padding: 0 14px 10px;
+        min-height: 100vh;
     }
 
-    .tab {
+    /* Sidebar Styles (Matching Reference Mockup Image) */
+    .sidebar {
+        width: 250px;
+        background: var(--sidebar-bg);
+        border-right: 1px solid var(--border-color);
+        display: flex;
+        flex-direction: column;
+        padding: 24px 16px;
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 100;
+        overflow-y: auto;
+    }
+
+    .brand {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        font-size: 1.25rem;
+        font-weight: 800;
+        letter-spacing: -0.5px;
+        color: #0f172a;
+        margin-bottom: 26px;
+        padding-left: 8px;
+    }
+
+    .brand-name {
+        color: #0f172a;
+    }
+
+    .brand-dot {
+        color: #0ea5e9;
+    }
+
+    .sidebar-nav {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        flex: 1;
+    }
+
+    .nav-section {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .nav-section-title {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.6px;
+        color: #94a3b8;
+        padding-left: 10px;
+        margin-bottom: 6px;
+        text-transform: uppercase;
+    }
+
+    .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 14px;
+        border-radius: 12px;
         border: none;
-        background: rgba(255, 255, 255, .08);
-        color: #d9e3f7;
-        padding: 8px 14px;
-        border-radius: 7px;
-        font-size: 12.5px;
+        background: transparent;
+        color: #64748b;
+        font-family: var(--font-main);
+        font-size: 13.5px;
+        font-weight: 600;
         cursor: pointer;
+        width: 100%;
+        text-align: left;
+        transition: all 0.15s ease;
+    }
+
+    .nav-item:hover {
+        background: #f1f5f9;
+        color: #0f172a;
+    }
+
+    .nav-item.active {
+        background: #f1f5f9;
+        color: #0f172a;
+        font-weight: 700;
+    }
+
+    .nav-icon {
+        font-size: 16px;
+        width: 20px;
+        display: inline-flex;
+        justify-content: center;
+    }
+
+    .nav-label {
+        flex: 1;
+    }
+
+    .nav-badge {
+        background: #0ea5e9;
+        color: #ffffff;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 2px 7px;
+        border-radius: 12px;
+    }
+
+    .sidebar-footer {
+        padding-top: 16px;
+        border-top: 1px solid #f1f5f9;
+    }
+
+    .user-profile-card {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 10px;
+        border-radius: 12px;
+        background: #f8fafc;
+    }
+
+    .user-avatar {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: #0f172a;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .user-details {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .user-name {
+        font-size: 12.5px;
+        font-weight: 700;
+        color: #0f172a;
+    }
+
+    .user-role {
+        font-size: 11px;
+        color: #94a3b8;
+    }
+
+    /* Main Right Content Area */
+    .main-body {
+        margin-left: 250px;
+        flex: 1;
+        min-height: 100vh;
+        padding: 28px 36px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Top Header Bar */
+    .top-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 28px;
+    }
+
+    .header-titles h1 {
+        margin: 0;
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: #0f172a;
+        letter-spacing: -0.5px;
+    }
+
+    .header-titles p {
+        margin: 4px 0 0 0;
+        font-size: 0.85rem;
+        color: #64748b;
+    }
+
+    .header-right {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+    }
+
+    .header-icon-btn {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: #ffffff;
+        border: 1px solid var(--border-color);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        position: relative;
+        font-size: 16px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+    }
+
+    .header-dot {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #ef4444;
+        border: 2px solid #ffffff;
+    }
+
+    .header-user {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: #ffffff;
+        border: 1px solid var(--border-color);
+        padding: 6px 14px;
+        border-radius: 30px;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+    }
+
+    .header-avatar {
+        font-size: 16px;
+    }
+
+    .header-user-name {
+        font-size: 13px;
+        font-weight: 700;
+        color: #0f172a;
+    }
+
+    .header-arrow {
+        font-size: 12px;
+        color: #94a3b8;
+    }
+
+    /* Dashboard Top Pastel Cards Grid (Matching Reference Mockup Image) */
+    .dash-top-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    @media (max-width: 1200px) {
+        .dash-top-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    .dash-card {
+        border-radius: 18px;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        min-height: 130px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.015);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .dash-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.03);
+    }
+
+    .dash-card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .dash-card-title {
+        font-size: 12.5px;
+        font-weight: 600;
+        color: #475569;
+    }
+
+    .dash-arrow-btn {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .dash-card-value {
+        font-size: 1.4rem;
+        font-weight: 800;
+        margin: 10px 0 4px 0;
+        letter-spacing: -0.5px;
+    }
+
+    .dash-card-sub {
+        font-size: 11.5px;
+        font-weight: 500;
+    }
+
+    /* Card color variations matching the reference image */
+    .card-orange {
+        background: #ffedd5;
+        border: 1px solid #fed7aa;
+        color: #7c2d12;
+    }
+    .text-orange { color: #c2410c; }
+
+    .card-green {
+        background: #dcfce7;
+        border: 1px solid #bbf7d0;
+        color: #14532d;
+    }
+    .text-green { color: #15803d; }
+
+    .card-purple {
+        background: #f3e8ff;
+        border: 1px solid #e9d5ff;
+        color: #581c87;
+    }
+    .text-purple { color: #7e22ce; }
+
+    .card-cyan {
+        background: #cffafe;
+        border: 1px solid #a5f3fc;
+        color: #164e63;
+    }
+    .text-cyan { color: #0e7490; }
+
+    /* Teal Hero Widget (Matching Mockup Image Large Teal Container) */
+    .dash-hero-teal {
+        grid-column: span 2;
+        background: linear-gradient(135deg, #0d9488, #0f766e);
+        color: #ffffff;
+        border-radius: 18px;
+        padding: 22px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        box-shadow: 0 6px 20px rgba(13, 148, 136, 0.2);
+    }
+
+    .hero-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+    }
+
+    .hero-title {
+        font-size: 13px;
+        font-weight: 600;
+        opacity: 0.9;
+    }
+
+    .hero-val {
+        font-size: 1.35rem;
+        font-weight: 800;
+        margin-top: 4px;
+    }
+
+    .hero-badge-pill {
+        background: rgba(255,255,255,0.2);
+        backdrop-filter: blur(4px);
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 11px;
         font-weight: 600;
     }
 
-    .tab.active {
-        background: var(--gold);
-        color: var(--navy-dark);
+    .hero-bars-visual {
+        display: flex;
+        align-items: flex-end;
+        gap: 10px;
+        height: 48px;
+        margin-top: 18px;
     }
 
-    .tab:hover:not(.active) {
-        background: rgba(255, 255, 255, .18);
+    .bar-col {
+        flex: 1;
+        background: rgba(255,255,255,0.35);
+        border-radius: 4px;
+        transition: all 0.3s ease;
     }
 
-    .content {
-        background: var(--bg);
-        padding: 20px;
-        min-height: 400px;
-        border-radius: 0 0 10px 10px;
+    .bar-col.active {
+        background: #fef08a;
+        box-shadow: 0 0 10px rgba(254, 240, 138, 0.5);
     }
 
+    /* Cards & Tables Container Styles */
     .card {
-        background: var(--card);
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        padding: 16px 18px;
-        margin-bottom: 16px;
+        background: #ffffff;
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        padding: 20px 22px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 14px rgba(0,0,0,0.015);
     }
 
     .card h2 {
-        font-size: 14.5px;
-        margin: 0 0 4px;
-        color: var(--navy);
+        font-size: 1.05rem;
+        font-weight: 800;
+        margin: 0 0 4px 0;
+        color: #0f172a;
+        letter-spacing: -0.3px;
     }
 
     .card .sub {
-        font-size: 12px;
-        color: var(--muted);
-        margin: 0 0 14px;
+        font-size: 12.5px;
+        color: #64748b;
+        margin: 0 0 16px 0;
     }
 
     .grid {
         display: grid;
-        gap: 12px;
+        gap: 14px;
     }
 
-    .grid.c2 {
-        grid-template-columns: 1fr 1fr;
-    }
-
-    .grid.c3 {
-        grid-template-columns: 1fr 1fr 1fr;
-    }
-
-    .grid.c4 {
-        grid-template-columns: repeat(4, 1fr);
-    }
+    .grid.c2 { grid-template-columns: 1fr 1fr; }
+    .grid.c3 { grid-template-columns: 1fr 1fr 1fr; }
+    .grid.c4 { grid-template-columns: repeat(4, 1fr); }
 
     label {
         font-size: 11.5px;
         font-weight: 700;
-        color: var(--muted);
+        color: #64748b;
         display: block;
-        margin-bottom: 4px;
+        margin-bottom: 6px;
         text-transform: uppercase;
         letter-spacing: .3px;
     }
 
-    input,
-    select,
-    textarea {
+    input, select, textarea {
         width: 100%;
-        padding: 8px 9px;
-        border: 1px solid #cfd6e4;
-        border-radius: 7px;
+        padding: 9px 12px;
+        border: 1px solid #cbd5e1;
+        border-radius: 10px;
+        font-family: var(--font-main);
         font-size: 13px;
         background: #fff;
-        color: var(--ink);
+        color: #0f172a;
+        outline: none;
+        transition: all 0.15s ease;
     }
 
-    input:focus,
-    select:focus,
-    textarea:focus {
-        outline: 2px solid var(--gold-light);
-        border-color: var(--gold);
+    input:focus, select:focus, textarea:focus {
+        border-color: #0ea5e9;
+        box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
     }
 
     .field {
-        margin-bottom: 10px;
+        margin-bottom: 12px;
     }
 
     .btn {
         border: none;
-        padding: 9px 16px;
-        border-radius: 7px;
-        font-size: 12.5px;
+        padding: 10px 18px;
+        border-radius: 10px;
+        font-family: var(--font-main);
+        font-size: 13px;
         font-weight: 700;
         cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.15s ease;
     }
 
     .btn-primary {
-        background: var(--navy);
+        background: #0f172a;
         color: #fff;
     }
 
     .btn-primary:hover {
-        background: var(--navy-light);
+        background: #1e293b;
     }
 
     .btn-gold {
-        background: var(--gold);
-        color: var(--navy-dark);
+        background: #0d9488;
+        color: #ffffff;
     }
 
     .btn-gold:hover {
-        background: var(--gold-light);
+        background: #0f766e;
     }
 
     .btn-outline {
         background: #fff;
-        border: 1px solid #cfd6e4;
-        color: var(--ink);
+        border: 1px solid #cbd5e1;
+        color: #0f172a;
     }
 
     .btn-outline:hover {
-        background: #f0f2f7;
+        background: #f8fafc;
     }
 
     .btn-danger {
-        background: var(--bad-bg);
-        color: var(--bad);
+        background: #fee2e2;
+        color: #dc2626;
     }
 
     .btn-sm {
-        padding: 5px 10px;
-        font-size: 11.5px;
+        padding: 6px 12px;
+        font-size: 12px;
     }
 
     table {
         width: 100%;
         border-collapse: collapse;
-        font-size: 12.5px;
+        font-size: 13px;
     }
 
-    th,
-    td {
-        padding: 7px 8px;
-        border-bottom: 1px solid var(--line);
+    th, td {
+        padding: 10px 12px;
+        border-bottom: 1px solid #f1f5f9;
         text-align: left;
     }
 
     th {
-        background: #f7f9fc;
-        color: var(--navy);
-        font-size: 11px;
+        background: #f8fafc;
+        color: #475569;
+        font-size: 11.5px;
+        font-weight: 700;
         text-transform: uppercase;
         letter-spacing: .3px;
     }
 
     tr:hover td {
-        background: #fbfcfe;
+        background: #f8fafc;
     }
 
-    .right {
-        text-align: right;
-    }
-
-    .center {
-        text-align: center;
-    }
+    .right { text-align: right; }
+    .center { text-align: center; }
 
     .badge {
-        display: inline-block;
-        padding: 3px 9px;
+        display: inline-flex;
+        align-items: center;
+        padding: 3px 10px;
         border-radius: 20px;
         font-size: 11px;
         font-weight: 700;
     }
 
-    .badge-ok {
-        background: var(--ok-bg);
-        color: var(--ok);
-    }
+    .badge-ok { background: #dcfce7; color: #16a34a; }
+    .badge-warn { background: #fef3c7; color: #d97706; }
+    .badge-bad { background: #fee2e2; color: #dc2626; }
 
-    .badge-warn {
-        background: var(--warn-bg);
-        color: var(--warn);
-    }
+    .row-actions { display: flex; gap: 6px; }
 
-    .badge-bad {
-        background: var(--bad-bg);
-        color: var(--bad);
-    }
-
-    .row-actions {
+    .trx-list-mock {
         display: flex;
-        gap: 6px;
+        flex-direction: column;
+        gap: 8px;
     }
 
-    .kpi {
-        background: var(--card);
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        padding: 14px;
+    .trx-item-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px;
+        border-radius: 12px;
+        transition: background 0.15s ease;
     }
 
-    .kpi .num {
-        font-size: 20px;
+    .trx-item-row:hover { background: #f8fafc; }
+
+    .trx-icon-circle {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+    }
+    .icon-green { background: #dcfce7; color: #16a34a; }
+    .icon-orange { background: #ffedd5; color: #ea580c; }
+
+    .workflow-steps {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        margin-top: 10px;
+    }
+
+    .wf-step {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .wf-num {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: #f1f5f9;
+        color: #0f172a;
+        font-size: 12px;
         font-weight: 800;
-        color: var(--navy);
-    }
-
-    .kpi .lbl {
-        font-size: 11px;
-        color: var(--muted);
-        text-transform: uppercase;
-        letter-spacing: .3px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
     }
 
     .subtabs {
@@ -300,127 +671,175 @@
     }
 
     .subtab {
-        border: 1px solid var(--line);
+        border: 1px solid #cbd5e1;
         background: #fff;
-        padding: 6px 12px;
+        padding: 6px 14px;
         border-radius: 20px;
         font-size: 12px;
         cursor: pointer;
         font-weight: 600;
-        color: var(--muted);
+        color: #64748b;
     }
 
     .subtab.active {
-        background: var(--navy);
+        background: #0f172a;
         color: #fff;
-        border-color: var(--navy);
+        border-color: #0f172a;
     }
 
     .empty {
         padding: 30px;
         text-align: center;
-        color: var(--muted);
-        font-size: 12.5px;
+        color: #94a3b8;
+        font-size: 13px;
     }
 
     .note {
-        background: var(--warn-bg);
-        border: 1px solid #f2d49a;
-        border-radius: 8px;
-        padding: 10px 12px;
-        font-size: 12px;
-        color: #7a4a06;
+        background: #fef3c7;
+        border: 1px solid #fde68a;
+        border-radius: 10px;
+        padding: 12px 14px;
+        font-size: 12.5px;
+        color: #92400e;
         margin-top: 10px;
     }
 
     .note.blue {
-        background: #e9f0fe;
-        border-color: #bcd2f7;
-        color: #1c3f7d;
+        background: #e0f2fe;
+        border-color: #bae6fd;
+        color: #0369a1;
     }
 
     .copybox {
-        background: #0f1c3a;
-        color: #dfe9ff;
-        border-radius: 8px;
-        padding: 12px 14px;
+        background: #0f172a;
+        color: #e2e8f0;
+        border-radius: 12px;
+        padding: 14px 16px;
         font-family: ui-monospace, Consolas, monospace;
-        font-size: 12px;
+        font-size: 12.5px;
         line-height: 1.7;
         white-space: pre-wrap;
     }
 
     .toast {
         position: fixed;
-        bottom: 18px;
-        right: 18px;
-        background: var(--navy-dark);
+        bottom: 24px;
+        right: 24px;
+        background: #0f172a;
         color: #fff;
-        padding: 11px 18px;
-        border-radius: 8px;
-        font-size: 12.5px;
-        box-shadow: 0 6px 20px rgba(0, 0, 0, .25);
+        padding: 12px 20px;
+        border-radius: 12px;
+        font-size: 13px;
+        font-weight: 600;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, .2);
         z-index: 999;
-    }
-
-    .item-table input {
-        padding: 5px 6px;
-        font-size: 12px;
-    }
-
-    .flexend {
-        display: flex;
-        justify-content: flex-end;
-        gap: 8px;
-    }
-
-    .link-btn {
-        background: none;
-        border: none;
-        color: var(--navy);
-        text-decoration: underline;
-        cursor: pointer;
-        font-size: 12px;
-        padding: 0;
-    }
-
-    hr.sep {
-        border: none;
-        border-top: 1px solid var(--line);
-        margin: 14px 0;
-    }
-
-    .muted {
-        color: var(--muted);
-    }
-
-    .small {
-        font-size: 11.5px;
     }
 
     .approval-row {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 10px 0;
-        border-bottom: 1px solid var(--line);
+        padding: 12px 0;
+        border-bottom: 1px solid #f1f5f9;
         gap: 10px;
     }
 
     .approval-row:last-child {
         border-bottom: none;
     }
-</style>
+    </style>
 
-<div class="app">
-    <div class="topbar">
-        <h1>SIPGN &amp; Laporan Keuangan SPPG — Sistem Terpadu</h1>
-        <p id="subhead">Bantu isi form Pengadaan (SCM) SIPGN + auto-generate BKU, buku pembantu &amp; approval keuangan
-        </p>
+    <div class="app-layout">
+        <!-- Sidebar Navigation Left -->
+        <aside class="sidebar">
+            <div class="brand">
+                <span class="brand-name">SIPGN</span><span class="brand-dot">.HELPER</span>
+            </div>
+
+            <div class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-section-title">MAIN MENU</div>
+                    <button class="nav-item active" data-tab="dashboard" onclick="setTab('dashboard')">
+                        <span class="nav-icon">🏠</span>
+                        <span class="nav-label">Dashboard</span>
+                    </button>
+                    <button class="nav-item" data-tab="approval" onclick="setTab('approval')">
+                        <span class="nav-icon">⚡</span>
+                        <span class="nav-label">Approval &amp; Digest</span>
+                        <span class="nav-badge" id="badge-approval" style="display:none;"></span>
+                    </button>
+                    <button class="nav-item" data-tab="sipgn" onclick="setTab('sipgn')">
+                        <span class="nav-icon">🛒</span>
+                        <span class="nav-label">SIPGN Helper</span>
+                    </button>
+                    <button class="nav-item" data-tab="ocr" onclick="setTab('ocr')">
+                        <span class="nav-icon">📷</span>
+                        <span class="nav-label">OCR Struk</span>
+                    </button>
+                    <button class="nav-item" data-tab="transaksi" onclick="setTab('transaksi')">
+                        <span class="nav-icon">⇅</span>
+                        <span class="nav-label">Transaksi</span>
+                    </button>
+                    <button class="nav-item" data-tab="kas" onclick="setTab('kas')">
+                        <span class="nav-icon">💳</span>
+                        <span class="nav-label">Kas &amp; Pembayaran</span>
+                    </button>
+                    <button class="nav-item" data-tab="pajak" onclick="setTab('pajak')">
+                        <span class="nav-icon">📑</span>
+                        <span class="nav-label">Pajak &amp; Upah</span>
+                    </button>
+                </div>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">LAPORAN &amp; AKUN</div>
+                    <button class="nav-item" data-tab="buku" onclick="setTab('buku')">
+                        <span class="nav-icon">📚</span>
+                        <span class="nav-label">Buku Otomatis</span>
+                    </button>
+                    <button class="nav-item" data-tab="laporan" onclick="setTab('laporan')">
+                        <span class="nav-icon">📊</span>
+                        <span class="nav-label">Laporan Keuangan</span>
+                    </button>
+                    <button class="nav-item" data-tab="setup" onclick="setTab('setup')">
+                        <span class="nav-icon">⚙️</span>
+                        <span class="nav-label">Setup &amp; Profil</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="sidebar-footer">
+                <div class="user-profile-card" onclick="setTab('setup')" style="cursor:pointer;">
+                    <div class="user-avatar">SP</div>
+                    <div class="user-details">
+                        <div class="user-name" id="sb-user-name">Pengelola SPPG</div>
+                        <div class="user-role">Keuangan &amp; SCM</div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Body Content Right -->
+        <main class="main-body">
+            <header class="top-header">
+                <div class="header-titles">
+                    <h1 id="header-title">Selamat Datang Kembali 👋</h1>
+                    <p id="header-subtitle">Ringkasan transaksi, otomatisasi SCM &amp; laporan keuangan SPPG</p>
+                </div>
+                <div class="header-right">
+                    <button class="header-icon-btn" onclick="setTab('approval')" title="Notifikasi Approval">
+                        🔔 <span class="header-dot" id="header-dot" style="display:none;"></span>
+                    </button>
+                    <div class="header-user" onclick="setTab('setup')">
+                        <span class="header-avatar">👤</span>
+                        <span class="header-user-name" id="top-user-name">Pengelola SPPG</span>
+                        <span class="header-arrow">⌄</span>
+                    </div>
+                </div>
+            </header>
+
+            <div class="content-area" id="content"></div>
+        </main>
     </div>
-    <div class="tabs" id="tabs"></div>
-    <div class="content" id="content"></div>
-</div>
 
 <script>
     const TABS = [
@@ -716,9 +1135,55 @@
 
     // ---------- render root ----------
     function render() {
-        const tabsEl = document.getElementById('tabs');
         const pendingCount = pendingApprovals().length;
-        tabsEl.innerHTML = TABS.map(t => `<button class="tab ${t.id === activeTab ? 'active' : ''}" onclick="setTab('${t.id}')">${t.label}${t.id === 'approval' && pendingCount ? ' (' + pendingCount + ')' : ''}</button>`).join('');
+
+        // Update sidebar navigation active item state & badges
+        document.querySelectorAll('.nav-item').forEach(el => {
+            if (el.getAttribute('data-tab') === activeTab) {
+                el.classList.add('active');
+            } else {
+                el.classList.remove('active');
+            }
+        });
+
+        const badgeEl = document.getElementById('badge-approval');
+        const headerDot = document.getElementById('header-dot');
+        if (badgeEl) {
+            if (pendingCount > 0) {
+                badgeEl.textContent = pendingCount;
+                badgeEl.style.display = 'inline-flex';
+                if (headerDot) headerDot.style.display = 'block';
+            } else {
+                badgeEl.style.display = 'none';
+                if (headerDot) headerDot.style.display = 'none';
+            }
+        }
+
+        // Update username in sidebar & header profile
+        const nameStr = DB.setup.namaSPPG || 'Pengelola SPPG';
+        const sbName = document.getElementById('sb-user-name');
+        const topName = document.getElementById('top-user-name');
+        if (sbName) sbName.textContent = nameStr;
+        if (topName) topName.textContent = nameStr;
+
+        // Update header dynamic title & subtitle based on active tab
+        const titleEl = document.getElementById('header-title');
+        const subEl = document.getElementById('header-subtitle');
+        const titles = {
+            dashboard: { t: 'Selamat Datang Kembali 👋', s: 'Ringkasan transaksi, otomatisasi SCM & laporan SPPG' },
+            approval: { t: 'Approval & Digest', s: 'Persetujuan pengeluaran, vendor baru & pengajuan batch' },
+            sipgn: { t: 'SIPGN Helper', s: 'Form bantu pengadaan bahan baku langsung ke sipgn.bgn.go.id' },
+            ocr: { t: 'OCR Struk', s: 'Membaca foto nota belanja otomatis dengan AI' },
+            transaksi: { t: 'Pencatatan Transaksi', s: 'Kelola arus kas masuk (debit) & pengeluaran (kredit)' },
+            kas: { t: 'Kas & Pembayaran', s: 'Ringkasan burn rate, estimasi runway & pengajuan batch' },
+            pajak: { t: 'Pajak & Upah', s: 'Daftar nominatif relawan, BPJS, PPN & estimasi PPh 21' },
+            buku: { t: 'Buku Otomatis', s: 'Buku Kas Umum (BKU), Buku Pembantu Kas, Pajak & Catatan' },
+            laporan: { t: 'Laporan Keuangan', s: 'Laporan Penggunaan Anggaran (LPA) & dokumen pendukung' },
+            setup: { t: 'Setup Profil & Anggaran', s: 'Konfigurasi profil SPPG, ambang approval & anggaran' }
+        };
+        if (titleEl && titles[activeTab]) titleEl.textContent = titles[activeTab].t;
+        if (subEl && titles[activeTab]) subEl.textContent = titles[activeTab].s;
+
         const c = document.getElementById('content');
         if (activeTab === 'dashboard') c.innerHTML = renderDashboard();
         else if (activeTab === 'approval') c.innerHTML = renderApproval();
@@ -736,32 +1201,147 @@
         if (id === 'ocr') refreshOcrQueue();
     }
 
-    // ---------- DASHBOARD ----------
+    // ---------- DASHBOARD (Matching Reference Mockup Layout) ----------
     function renderDashboard() {
         const totalKas = saldoAkhirKasTotal();
+        const kRows = sortedTransaksi().filter(t => t.tipe === 'K');
+        const totalKeluar = kRows.reduce((s, t) => s + t.jumlah, 0);
         const jmlTransaksi = DB.transaksi.length;
         const jmlDraft = DB.pembelian.filter(p => p.status === 'draft').length;
         const jmlTerkirim = DB.pembelian.filter(p => p.status === 'terkirim').length;
         const pend = pendingApprovals().length;
+
+        const recentTrx = allTransaksiSorted().slice().reverse().slice(0, 5);
+
         return `
-  <div class="grid c4" style="margin-bottom:16px;">
-    <div class="kpi"><div class="num">${rupiah(totalKas)}</div><div class="lbl">Saldo Kas (BKU)</div></div>
-    <div class="kpi"><div class="num">${jmlTransaksi}</div><div class="lbl">Total Transaksi</div></div>
-    <div class="kpi"><div class="num" style="${pend ? 'color:var(--warn)' : ''}">${pend}</div><div class="lbl">Menunggu Approval</div></div>
-    <div class="kpi"><div class="num">${jmlDraft}/${jmlTerkirim}</div><div class="lbl">Pembelian Draft/Terkirim</div></div>
-  </div>
-  ${pend ? `<div class="note">${pend} item menunggu persetujuan. <button class="link-btn" onclick="setTab('approval')">Buka Approval →</button></div>` : ''}
-  <div class="card">
-    <h2>Alur kerja</h2>
-    <ol class="small" style="margin:0;padding-left:18px;line-height:1.9;">
-      <li>Setup — profil &amp; anggaran</li>
-      <li>SIPGN Helper / OCR Struk — catat pembelian</li>
-      <li>Transaksi — catat kas masuk/keluar lain</li>
-      <li>Approval — setujui yang menunggu</li>
-      <li>Buku Otomatis &amp; Laporan — otomatis dari transaksi tersetujui</li>
-    </ol>
-  </div>
-  `;
+    <!-- Top Grid Pastel Cards (Matching Mockup Image) -->
+    <div class="dash-top-grid">
+      <!-- Balance Card (Soft Orange/Warm) -->
+      <div class="dash-card card-orange">
+        <div class="dash-card-header">
+          <span class="dash-card-title">Saldo Kas (BKU)</span>
+          <span class="dash-arrow-btn">↗</span>
+        </div>
+        <div class="dash-card-value">${rupiah(totalKas)}</div>
+        <div class="dash-card-sub text-orange">Kas di Bank & Petty Cash</div>
+      </div>
+
+      <!-- Realisasi Card (Soft Green) -->
+      <div class="dash-card card-green">
+        <div class="dash-card-header">
+          <span class="dash-card-title">Total Realisasi Biaya</span>
+          <span class="dash-arrow-btn">↗</span>
+        </div>
+        <div class="dash-card-value">${rupiah(totalKeluar)}</div>
+        <div class="dash-card-sub text-green">Total Pengeluaran Terverifikasi</div>
+      </div>
+
+      <!-- Teal Hero Chart Banner (Matching Teal Box in Mockup Image) -->
+      <div class="dash-hero-teal">
+        <div class="hero-header">
+          <div>
+            <div class="hero-title">Aktivitas SCM &amp; Keuangan</div>
+            <div class="hero-val">${jmlTransaksi} Transaksi Total</div>
+          </div>
+          <span class="hero-badge-pill">Periode Berjalan</span>
+        </div>
+        <div class="hero-bars-visual">
+          <div class="bar-col" style="height: 40%"></div>
+          <div class="bar-col" style="height: 65%"></div>
+          <div class="bar-col active" style="height: 85%"></div>
+          <div class="bar-col" style="height: 50%"></div>
+          <div class="bar-col" style="height: 75%"></div>
+          <div class="bar-col" style="height: 90%"></div>
+          <div class="bar-col" style="height: 60%"></div>
+        </div>
+      </div>
+
+      <!-- Menunggu Approval Card (Soft Lavender/Purple) -->
+      <div class="dash-card card-purple">
+        <div class="dash-card-header">
+          <span class="dash-card-title">Menunggu Approval</span>
+          <span class="dash-arrow-btn">↗</span>
+        </div>
+        <div class="dash-card-value">${pend} Item</div>
+        <div class="dash-card-sub text-purple">${pend > 0 ? 'Perlu persetujuan Anda' : 'Semua transaksi tersetujui'}</div>
+      </div>
+
+      <!-- SIPGN Pembelian Status (Soft Cyan/Teal) -->
+      <div class="dash-card card-cyan">
+        <div class="dash-card-header">
+          <span class="dash-card-title">Pembelian SIPGN</span>
+          <span class="dash-arrow-btn">↗</span>
+        </div>
+        <div class="dash-card-value">${jmlDraft} Draft / ${jmlTerkirim} Kirim</div>
+        <div class="dash-card-sub text-cyan">Status Form Pembelian</div>
+      </div>
+    </div>
+
+    ${pend ? `<div class="note" style="margin-bottom: 20px;">⚠️ <b>${pend} item</b> membutuhkan persetujuan Anda. <button class="link-btn" onclick="setTab('approval')">Buka Approval &amp; Digest →</button></div>` : ''}
+
+    <!-- Bottom Two Columns Grid (Matching Mockup Image: Recent Transactions + Quick Actions) -->
+    <div class="grid c2" style="align-items: start;">
+      <div class="card" style="margin-bottom:0;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+          <h2 style="margin:0;">Transaksi Terbaru</h2>
+          <button class="link-btn" onclick="setTab('transaksi')">Lihat Semua →</button>
+        </div>
+        ${recentTrx.length === 0 ? '<div class="empty">Belum ada transaksi recorded.</div>' : `
+          <div class="trx-list-mock">
+            ${recentTrx.map(t => `
+              <div class="trx-item-row">
+                <div class="trx-icon-circle ${t.tipe === 'D' ? 'icon-green' : 'icon-orange'}">
+                  ${t.tipe === 'D' ? '📥' : '🛒'}
+                </div>
+                <div style="flex:1;">
+                  <div style="font-weight:700; font-size:13.5px; color:#0f172a;">${t.uraian}</div>
+                  <div style="font-size:11.5px; color:#64748b;">${fmtDate(t.tanggal)} · ${coaByKode(t.akunKas)?.nama || t.akunKas}</div>
+                </div>
+                <div style="font-weight:800; font-size:13.5px; color:${t.tipe === 'D' ? '#16a34a' : '#0f172a'};">
+                  ${t.tipe === 'D' ? '+' : '-'}${rupiah(t.jumlah)}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `}
+      </div>
+
+      <div class="card" style="margin-bottom:0;">
+        <h2>Alur Kerja Sistem Terpadu</h2>
+        <p class="sub">Ikuti urutan otomatisasi untuk memastikan pembukuan SPPG akurat.</p>
+        <div class="workflow-steps">
+          <div class="wf-step">
+            <div class="wf-num">1</div>
+            <div>
+              <b>Setup Profil &amp; Anggaran</b>
+              <div class="small muted">Atur pagu anggaran per kategori &amp; ambang batas approval.</div>
+            </div>
+          </div>
+          <div class="wf-step">
+            <div class="wf-num">2</div>
+            <div>
+              <b>Input Pembelian SIPGN / OCR Struk</b>
+              <div class="small muted">Foto nota belanja dengan AI atau gunakan form siap-salin SIPGN.</div>
+            </div>
+          </div>
+          <div class="wf-step">
+            <div class="wf-num">3</div>
+            <div>
+              <b>Approval &amp; Persetujuan Keuangan</b>
+              <div class="small muted">Verifikasi otomatis untuk pengeluaran di atas ambang batas.</div>
+            </div>
+          </div>
+          <div class="wf-step">
+            <div class="wf-num">4</div>
+            <div>
+              <b>Buku Kas &amp; Laporan Otomatis</b>
+              <div class="small muted">BKU, BP Kas, BP Pajak, &amp; Laporan LPA ter-generate otomatis.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    `;
     }
 
     // ---------- APPROVAL & DIGEST (Orchestrator-lite) ----------
