@@ -1292,14 +1292,14 @@
     ${pend ? `<div class="note" style="margin-bottom: 20px;">⚠️ <b>${pend} item</b> membutuhkan persetujuan Anda. <button class="link-btn" onclick="setTab('approval')">Buka Approval &amp; Digest →</button></div>` : ''}
 
     <!-- Bottom Two Columns Grid (Matching Mockup Image: Recent Transactions + Quick Actions) -->
-    <div class="grid c2" style="align-items: start;">
-      <div class="card" style="margin-bottom:0;">
+    <div class="grid c2" style="align-items: stretch;">
+      <div class="card" style="margin-bottom:0; min-height: 310px; height: 100%; display: flex; flex-direction: column;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
           <h2 style="margin:0;">Transaksi Terbaru</h2>
           <button class="link-btn" onclick="setTab('transaksi')">Lihat Semua →</button>
         </div>
-        ${recentTrx.length === 0 ? '<div class="empty">Belum ada transaksi recorded.</div>' : `
-          <div class="trx-list-mock">
+        ${recentTrx.length === 0 ? '<div class="empty" style="flex:1; display:flex; align-items:center; justify-content:center;">Belum ada transaksi recorded.</div>' : `
+          <div class="trx-list-mock" style="flex:1;">
             ${recentTrx.map(t => `
               <div class="trx-item-row">
                 <div class="trx-icon-circle ${t.tipe === 'D' ? 'icon-green' : 'icon-orange'}">
@@ -1318,36 +1318,36 @@
         `}
       </div>
 
-      <div class="card" style="margin-bottom:0;">
+      <div class="card" style="margin-bottom:0; min-height: 310px; height: 100%; display: flex; flex-direction: column;">
         <h2>Alur Kerja Sistem Terpadu</h2>
-        <p class="sub">Ikuti urutan otomatisasi untuk memastikan pembukuan SPPG akurat.</p>
-        <div class="workflow-steps">
+        <p class="sub" style="margin:0 0 16px 0; font-size:12.5px; color:#64748b;">Ikuti urutan otomatisasi untuk memastikan pembukuan SPPG akurat.</p>
+        <div class="workflow-steps" style="flex:1; display:flex; flex-direction:column; justify-content:space-between;">
           <div class="wf-step">
             <div class="wf-num">1</div>
             <div>
-              <b>Setup Profil &amp; Anggaran</b>
-              <div class="small muted">Atur pagu anggaran per kategori &amp; ambang batas approval.</div>
+              <div style="font-weight:700; font-size:13.5px; color:#0f172a;">Setup Profil &amp; Anggaran</div>
+              <div style="font-size:12.5px; color:#64748b; font-family:var(--font-main); font-weight:400; margin-top:2px; line-height:1.5;">Atur pagu anggaran per kategori &amp; ambang batas approval.</div>
             </div>
           </div>
           <div class="wf-step">
             <div class="wf-num">2</div>
             <div>
-              <b>Input Pembelian SIPGN / OCR Struk</b>
-              <div class="small muted">Foto nota belanja dengan AI atau gunakan form siap-salin SIPGN.</div>
+              <div style="font-weight:700; font-size:13.5px; color:#0f172a;">Input Pembelian SIPGN / OCR Struk</div>
+              <div style="font-size:12.5px; color:#64748b; font-family:var(--font-main); font-weight:400; margin-top:2px; line-height:1.5;">Foto nota belanja dengan AI atau gunakan form siap-salin SIPGN.</div>
             </div>
           </div>
           <div class="wf-step">
             <div class="wf-num">3</div>
             <div>
-              <b>Approval &amp; Persetujuan Keuangan</b>
-              <div class="small muted">Verifikasi otomatis untuk pengeluaran di atas ambang batas.</div>
+              <div style="font-weight:700; font-size:13.5px; color:#0f172a;">Approval &amp; Persetujuan Keuangan</div>
+              <div style="font-size:12.5px; color:#64748b; font-family:var(--font-main); font-weight:400; margin-top:2px; line-height:1.5;">Verifikasi otomatis untuk pengeluaran di atas ambang batas.</div>
             </div>
           </div>
           <div class="wf-step">
             <div class="wf-num">4</div>
             <div>
-              <b>Buku Kas &amp; Laporan Otomatis</b>
-              <div class="small muted">BKU, BP Kas, BP Pajak, &amp; Laporan LPA ter-generate otomatis.</div>
+              <div style="font-weight:700; font-size:13.5px; color:#0f172a;">Buku Kas &amp; Laporan Otomatis</div>
+              <div style="font-size:12.5px; color:#64748b; font-family:var(--font-main); font-weight:400; margin-top:2px; line-height:1.5;">BKU, BP Kas, BP Pajak, &amp; Laporan LPA ter-generate otomatis.</div>
             </div>
           </div>
         </div>
