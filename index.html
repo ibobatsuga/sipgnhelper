@@ -1475,8 +1475,16 @@
         const rows = allTransaksiSorted().slice().reverse();
         return `
   <div class="card">
-    <h2>Input Transaksi</h2>
-    <p class="sub">Debit = dana masuk. Kredit = pengeluaran. Bisa juga catat lewat <button class="link-btn" onclick="setTab('ocr')">OCR Struk</button>.</p>
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:12px;">
+      <div>
+        <h2 style="margin:0;">Input Transaksi</h2>
+        <p class="sub" style="margin:4px 0 0 0;">Debit = dana masuk. Kredit = pengeluaran. Bisa juga catat lewat <button class="link-btn" onclick="setTab('ocr')">OCR Struk</button>.</p>
+      </div>
+      <label class="btn btn-outline" style="cursor:pointer; font-weight:700; padding:8px 14px; margin:0;">
+        📊 Upload File Excel / CSV
+        <input type="file" id="excel_csv_file" accept=".csv, .xlsx, .xls, text/csv" style="display:none;" onchange="handleExcelCsvUpload(event)">
+      </label>
+    </div>
     <div class="grid c4">
       <div class="field"><label>Tanggal</label><input id="t_tanggal" type="date" value="${todayStr()}"></div>
       <div class="field"><label>No. Bukti</label><input id="t_noBukti" placeholder="otomatis jika kosong"></div>
@@ -1535,32 +1543,6 @@
         save('transaksi'); render();
     }
 
-    // ---------- OCR STRUK & IMPORT (TIM) ----------
-    function renderOcr() {
-        const s = DB.setup;
-        return `
-  <div class="card">
-    <h2>OCR Struk &amp; Import Data Belanja</h2>
-    <p class="sub">Foto struk (baca otomatis AI) atau unggah file Excel / CSV berisi daftar pengeluaran belanja.</p>
-    <div class="grid c2">
-      <div class="field"><label>Nama Kamu / Pengirim</label><input id="ocrq_nama" value="${s.namaPengirimDefault || ''}" placeholder="cth: Budi (Gudang)"></div>
-      <div class="field"><label>Foto Struk/Nota</label><input type="file" id="ocrq_file" accept="image/*" capture="environment"></div>
-    </div>
-    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:10px; align-items:center;">
-      <button class="btn btn-gold" id="ocrq_btn" onclick="submitOcrQueue()">📷 Baca &amp; Kirim Struk</button>
-      <label class="btn btn-outline" style="cursor:pointer; margin:0; font-weight:700;">
-        📊 Upload File Excel / CSV
-        <input type="file" id="excel_csv_file" accept=".csv, .xlsx, .xls, text/csv" style="display:none;" onchange="handleExcelCsvUpload(event)">
-      </label>
-    </div>
-  </div>
-  <div class="card">
-    <h2>Antrean Struk &amp; Import</h2>
-    <div id="ocrQueueList" class="empty">Memuat...</div>
-  </div>
-  `;
-    }
-
     function handleExcelCsvUpload(event) {
         const file = event.target.files[0];
         if (!file) return;
@@ -1568,7 +1550,7 @@
         const fileName = file.name;
         const reader = new FileReader();
 
-        reader.onload = async function(e) {
+        reader.onload = function(e) {
             try {
                 const content = e.target.result;
                 const lines = content.split(/\r?\n/).filter(line => line.trim() !== '');
@@ -1583,59 +1565,75 @@
                 const headers = firstLine.split(delimiter).map(h => h.trim().replace(/^"|"$/g, '').toLowerCase());
 
                 let importedCount = 0;
-                await loadOcrQueue();
+                const defaultKas = (DB.coa.find(c => c.kategori === 'Kas') || {}).kode || '1000';
+                const defaultBiaya = (DB.coa.find(c => c.kategori === 'Biaya Bahan Baku') || {}).kode || '2010';
 
                 for (let i = 1; i < lines.length; i++) {
                     const cols = lines[i].split(delimiter).map(c => c.trim().replace(/^"|"$/g, ''));
                     if (cols.length === 0 || cols.every(c => c === '')) continue;
 
                     let tgl = todayStr();
-                    let vendor = 'Import Excel/CSV';
-                    let namaBarang = 'Barang';
-                    let jumlah = 1;
+                    let noBukti = 'CSV-' + uid().slice(-5);
+                    let uraian = 'Import CSV';
+                    let tipe = 'K';
+                    let jumlah = 0;
                     let harga = 0;
-                    let total = 0;
+                    let qty = 1;
 
                     headers.forEach((h, idx) => {
                         const val = cols[idx] || '';
                         if (h.includes('tgl') || h.includes('tanggal') || h.includes('date')) {
                             if (val) tgl = val;
-                        } else if (h.includes('vendor') || h.includes('pemasok') || h.includes('toko') || h.includes('supplier')) {
-                            if (val) vendor = val;
-                        } else if (h.includes('barang') || h.includes('item') || h.includes('nama') || h.includes('uraian') || h.includes('deskripsi')) {
-                            if (val) namaBarang = val;
+                        } else if (h.includes('bukti') || h.includes('ref') || h.includes('no')) {
+                            if (val) noBukti = val;
+                        } else if (h.includes('uraian') || h.includes('deskripsi') || h.includes('barang') || h.includes('nama') || h.includes('keterangan')) {
+                            if (val) uraian = val;
+                        } else if (h.includes('tipe') || h.includes('d/k') || h.includes('jenis')) {
+                            if (val.toUpperCase().startsWith('D') || val.toLowerCase().includes('masuk') || val.toLowerCase().includes('debit')) {
+                                tipe = 'D';
+                            } else {
+                                tipe = 'K';
+                            }
+                        } else if (h.includes('jumlah') || h.includes('nominal') || h.includes('total') || h.includes('kredit') || h.includes('debit')) {
+                            const parsedNum = Number(val.replace(/[^0-9.-]+/g, '')) || 0;
+                            if (parsedNum > 0) jumlah = parsedNum;
                         } else if (h.includes('harga') || h.includes('price')) {
                             harga = Number(val.replace(/[^0-9.-]+/g, '')) || 0;
-                        } else if (h.includes('jumlah') || h.includes('qty') || h.includes('quantity')) {
-                            jumlah = Number(val.replace(/[^0-9.-]+/g, '')) || 1;
-                        } else if (h.includes('total') || h.includes('jumlah total') || h.includes('subtotal') || h.includes('nominal')) {
-                            total = Number(val.replace(/[^0-9.-]+/g, '')) || 0;
+                        } else if (h.includes('qty') || h.includes('banyak')) {
+                            qty = Number(val.replace(/[^0-9.-]+/g, '')) || 1;
                         }
                     });
 
-                    if (!total && harga) total = harga * jumlah;
-                    if (!harga && total && jumlah) harga = Math.round(total / jumlah);
-                    if (total <= 0 && harga <= 0) continue;
+                    if (!jumlah && harga) jumlah = harga * qty;
+                    if (jumlah <= 0) continue;
 
-                    ocrQueueCache.push({
-                        id: uid(),
-                        submittedBy: 'Import CSV (' + fileName + ')',
-                        tanggalKirim: todayStr(),
-                        status: 'baru',
-                        extracted: {
-                            tanggal: tgl,
-                            vendor: vendor,
-                            items: [{ nama: namaBarang, jumlah: jumlah, harga: harga }],
-                            total: total
-                        }
+                    const trxId = uid();
+                    const needApp = tipe === 'K' && needsApprovalAmount(jumlah);
+
+                    DB.transaksi.push({
+                        id: trxId,
+                        tanggal: tgl,
+                        noBukti: noBukti,
+                        uraian: uraian + ' (' + fileName + ')',
+                        akunKas: defaultKas,
+                        akunLawan: tipe === 'D' ? '2000' : defaultBiaya,
+                        tipe: tipe,
+                        jumlah: jumlah,
+                        keterangan: 'Import CSV',
+                        sumber: 'manual',
+                        approvalStatus: needApp ? 'pending' : 'approved'
                     });
+
+                    if (needApp) {
+                        addApproval('transaksi', { linkedTransaksiId: trxId, deskripsi: uraian + ' (via Import CSV)', jumlah: jumlah });
+                    }
+
                     importedCount++;
                 }
 
-                await saveOcrQueue();
-                toast(`Berhasil mengimpor ${importedCount} data dari ${fileName}!`);
-                const el = document.getElementById('ocrQueueList');
-                if (el) el.innerHTML = renderOcrQueueListHtml();
+                save('transaksi');
+                render();
+                toast(`Berhasil mengimpor ${importedCount} transaksi dari ${fileName}!`);
                 event.target.value = '';
             } catch (err) {
                 console.error(err);
@@ -1645,6 +1643,29 @@
 
         reader.readAsText(file);
     }
+
+    // ---------- OCR STRUK & IMPORT (TIM) ----------
+    function renderOcr() {
+        const s = DB.setup;
+        return `
+  <div class="card">
+    <h2>OCR Struk &amp; Import Data Belanja</h2>
+    <p class="sub">Foto struk (baca otomatis AI) atau unggah file Excel / CSV berisi daftar pengeluaran belanja.</p>
+    <div class="grid c2">
+      <div class="field"><label>Nama Kamu / Pengirim</label><input id="ocrq_nama" value="${s.namaPengirimDefault || ''}" placeholder="cth: Budi (Gudang)"></div>
+      <div class="field"><label>Foto Struk/Nota</label><input type="file" id="ocrq_file" accept="image/*" capture="environment"></div>
+    </div>
+    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:10px; align-items:center;">
+      <button class="btn btn-gold" id="ocrq_btn" onclick="submitOcrQueue()">📷 Baca &amp; Kirim Struk</button>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Antrean Struk &amp; Import</h2>
+    <div id="ocrQueueList" class="empty">Memuat...</div>
+  </div>
+  `;
+    }
+
     function renderOcrQueueListHtml() {
         const pending = ocrQueueCache.filter(o => o.status === 'baru').slice().reverse();
         const done = ocrQueueCache.filter(o => o.status === 'selesai').slice().reverse().slice(0, 10);
