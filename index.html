@@ -1181,7 +1181,7 @@
         const titles = {
             dashboard: { t: 'Selamat Datang Kembali 👋', s: 'Ringkasan transaksi, otomatisasi SCM & laporan SPPG' },
             approval: { t: 'Approval & Digest', s: 'Persetujuan pengeluaran, vendor baru & pengajuan batch' },
-            sipgn: { t: 'SIPGN Helper', s: 'Form bantu pengadaan bahan baku langsung ke sipgn.bgn.go.id' },
+            sipgn: { t: 'SIPGN Helper', s: 'Pengadaan bahan baku langsung ke sipgn.bgn.go.id' },
             ocr: { t: 'OCR Struk', s: 'Membaca foto nota belanja otomatis dengan AI' },
             transaksi: { t: 'Pencatatan Transaksi', s: 'Kelola arus kas masuk (debit) & pengeluaran (kredit)' },
             kas: { t: 'Kas & Pembayaran', s: 'Ringkasan burn rate, estimasi runway & pengajuan batch' },
@@ -1808,12 +1808,12 @@
         return `
   <div class="grid c2" style="align-items:start;">
     <div class="card">
-      <h2>Kebutuhan Bahan Baku (opsional)</h2>
-      <p class="sub">Opsional, untuk bantu perencanaan.</p>
+      <h2>Kebutuhan Bahan Baku</h2>
+      <p class="sub">Untuk bantu perencanaan pengadaan bahan baku.</p>
       ${renderKebutuhanBox()}
     </div>
     <div class="card">
-      <h2>Pembelian Langsung — form bantu</h2>
+      <h2>Pembelian Langsung</h2>
       <p class="sub">Isi seperti form SIPGN, lalu salin ringkasannya ke situs asli.</p>
       ${renderPembelianForm()}
     </div>
