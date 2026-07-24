@@ -553,6 +553,15 @@
         background: #0f766e;
     }
 
+    .btn-green {
+        background: #16a34a;
+        color: #ffffff;
+    }
+
+    .btn-green:hover {
+        background: #15803d;
+    }
+
     .btn-outline {
         background: #fff;
         border: 1px solid #cbd5e1;
@@ -1492,8 +1501,8 @@
         <h2 style="margin:0;">Input Transaksi</h2>
         <p class="sub" style="margin:4px 0 0 0;">Debit = dana masuk. Kredit = pengeluaran. Bisa juga catat lewat <button class="link-btn" onclick="setTab('ocr')">OCR Struk</button>.</p>
       </div>
-      <label class="btn btn-outline" style="cursor:pointer; font-weight:700; padding:8px 14px; margin:0;">
-        📊 Upload File Excel / CSV
+      <label class="btn btn-green" style="cursor:pointer; font-weight:700; padding:8px 16px; margin:0; text-transform:none;">
+        Upload File Excel / CSV
         <input type="file" id="excel_csv_file" accept=".csv, .xlsx, .xls, text/csv" style="display:none;" onchange="handleExcelCsvUpload(event)">
       </label>
     </div>
@@ -1668,7 +1677,7 @@
       <div class="field"><label>Foto Struk/Nota</label><input type="file" id="ocrq_file" accept="image/*" capture="environment"></div>
     </div>
     <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:10px; align-items:center;">
-      <button class="btn btn-gold" id="ocrq_btn" onclick="submitOcrQueue()">📷 Baca &amp; Kirim Struk</button>
+      <button class="btn btn-green" id="ocrq_btn" onclick="submitOcrQueue()">Baca &amp; Kirim Struk</button>
     </div>
   </div>
   <div class="card">
@@ -1743,7 +1752,7 @@
             console.error(e);
             toast('Gagal membaca struk — coba foto yang lebih jelas/terang');
         } finally {
-            btn.textContent = '📷 Baca & Kirim ke Antrean Tim'; btn.disabled = false;
+            btn.textContent = 'Baca & Kirim Struk'; btn.disabled = false;
         }
     }
     function ocrToTransaksi(id) {
