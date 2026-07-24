@@ -1,0 +1,1656 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIPGN &amp; Laporan Keuangan SPPG — Sistem Terpadu</title>
+    <style>
+    :root {
+        --navy: #0e2a5e;
+        --navy-dark: #0a1d40;
+        --navy-light: #1c3f7d;
+        --gold: #c9a227;
+        --gold-light: #e8c96a;
+        --bg: #f3f5f9;
+        --card: #ffffff;
+        --line: #e1e6ef;
+        --ink: #1a2333;
+        --muted: #5b6577;
+        --ok: #1a8a4a;
+        --ok-bg: #e6f7ec;
+        --warn: #b45309;
+        --warn-bg: #fef3e0;
+        --bad: #b91c1c;
+        --bad-bg: #fdeaea;
+        font-family: 'Segoe UI', Arial, sans-serif;
+    }
+
+    * {
+        box-sizing: border-box;
+    }
+
+    body {
+        margin: 0;
+        color: var(--ink);
+        background: var(--bg);
+    }
+
+    .app {
+        max-width: 1180px;
+        margin: 0 auto;
+    }
+
+    .topbar {
+        background: linear-gradient(135deg, var(--navy-dark), var(--navy));
+        color: #fff;
+        padding: 18px 22px;
+        border-radius: 10px 10px 0 0;
+    }
+
+    .topbar h1 {
+        margin: 0;
+        font-size: 19px;
+        letter-spacing: .2px;
+    }
+
+    .topbar p {
+        margin: 4px 0 0;
+        font-size: 12.5px;
+        color: #cfe0ff;
+    }
+
+    .tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        background: var(--navy-dark);
+        padding: 0 14px 10px;
+    }
+
+    .tab {
+        border: none;
+        background: rgba(255, 255, 255, .08);
+        color: #d9e3f7;
+        padding: 8px 14px;
+        border-radius: 7px;
+        font-size: 12.5px;
+        cursor: pointer;
+        font-weight: 600;
+    }
+
+    .tab.active {
+        background: var(--gold);
+        color: var(--navy-dark);
+    }
+
+    .tab:hover:not(.active) {
+        background: rgba(255, 255, 255, .18);
+    }
+
+    .content {
+        background: var(--bg);
+        padding: 20px;
+        min-height: 400px;
+        border-radius: 0 0 10px 10px;
+    }
+
+    .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 16px 18px;
+        margin-bottom: 16px;
+    }
+
+    .card h2 {
+        font-size: 14.5px;
+        margin: 0 0 4px;
+        color: var(--navy);
+    }
+
+    .card .sub {
+        font-size: 12px;
+        color: var(--muted);
+        margin: 0 0 14px;
+    }
+
+    .grid {
+        display: grid;
+        gap: 12px;
+    }
+
+    .grid.c2 {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .grid.c3 {
+        grid-template-columns: 1fr 1fr 1fr;
+    }
+
+    .grid.c4 {
+        grid-template-columns: repeat(4, 1fr);
+    }
+
+    label {
+        font-size: 11.5px;
+        font-weight: 700;
+        color: var(--muted);
+        display: block;
+        margin-bottom: 4px;
+        text-transform: uppercase;
+        letter-spacing: .3px;
+    }
+
+    input,
+    select,
+    textarea {
+        width: 100%;
+        padding: 8px 9px;
+        border: 1px solid #cfd6e4;
+        border-radius: 7px;
+        font-size: 13px;
+        background: #fff;
+        color: var(--ink);
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+        outline: 2px solid var(--gold-light);
+        border-color: var(--gold);
+    }
+
+    .field {
+        margin-bottom: 10px;
+    }
+
+    .btn {
+        border: none;
+        padding: 9px 16px;
+        border-radius: 7px;
+        font-size: 12.5px;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    .btn-primary {
+        background: var(--navy);
+        color: #fff;
+    }
+
+    .btn-primary:hover {
+        background: var(--navy-light);
+    }
+
+    .btn-gold {
+        background: var(--gold);
+        color: var(--navy-dark);
+    }
+
+    .btn-gold:hover {
+        background: var(--gold-light);
+    }
+
+    .btn-outline {
+        background: #fff;
+        border: 1px solid #cfd6e4;
+        color: var(--ink);
+    }
+
+    .btn-outline:hover {
+        background: #f0f2f7;
+    }
+
+    .btn-danger {
+        background: var(--bad-bg);
+        color: var(--bad);
+    }
+
+    .btn-sm {
+        padding: 5px 10px;
+        font-size: 11.5px;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12.5px;
+    }
+
+    th,
+    td {
+        padding: 7px 8px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+    }
+
+    th {
+        background: #f7f9fc;
+        color: var(--navy);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: .3px;
+    }
+
+    tr:hover td {
+        background: #fbfcfe;
+    }
+
+    .right {
+        text-align: right;
+    }
+
+    .center {
+        text-align: center;
+    }
+
+    .badge {
+        display: inline-block;
+        padding: 3px 9px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 700;
+    }
+
+    .badge-ok {
+        background: var(--ok-bg);
+        color: var(--ok);
+    }
+
+    .badge-warn {
+        background: var(--warn-bg);
+        color: var(--warn);
+    }
+
+    .badge-bad {
+        background: var(--bad-bg);
+        color: var(--bad);
+    }
+
+    .row-actions {
+        display: flex;
+        gap: 6px;
+    }
+
+    .kpi {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px;
+    }
+
+    .kpi .num {
+        font-size: 20px;
+        font-weight: 800;
+        color: var(--navy);
+    }
+
+    .kpi .lbl {
+        font-size: 11px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: .3px;
+    }
+
+    .subtabs {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 14px;
+        flex-wrap: wrap;
+    }
+
+    .subtab {
+        border: 1px solid var(--line);
+        background: #fff;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        cursor: pointer;
+        font-weight: 600;
+        color: var(--muted);
+    }
+
+    .subtab.active {
+        background: var(--navy);
+        color: #fff;
+        border-color: var(--navy);
+    }
+
+    .empty {
+        padding: 30px;
+        text-align: center;
+        color: var(--muted);
+        font-size: 12.5px;
+    }
+
+    .note {
+        background: var(--warn-bg);
+        border: 1px solid #f2d49a;
+        border-radius: 8px;
+        padding: 10px 12px;
+        font-size: 12px;
+        color: #7a4a06;
+        margin-top: 10px;
+    }
+
+    .note.blue {
+        background: #e9f0fe;
+        border-color: #bcd2f7;
+        color: #1c3f7d;
+    }
+
+    .copybox {
+        background: #0f1c3a;
+        color: #dfe9ff;
+        border-radius: 8px;
+        padding: 12px 14px;
+        font-family: ui-monospace, Consolas, monospace;
+        font-size: 12px;
+        line-height: 1.7;
+        white-space: pre-wrap;
+    }
+
+    .toast {
+        position: fixed;
+        bottom: 18px;
+        right: 18px;
+        background: var(--navy-dark);
+        color: #fff;
+        padding: 11px 18px;
+        border-radius: 8px;
+        font-size: 12.5px;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, .25);
+        z-index: 999;
+    }
+
+    .item-table input {
+        padding: 5px 6px;
+        font-size: 12px;
+    }
+
+    .flexend {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+    }
+
+    .link-btn {
+        background: none;
+        border: none;
+        color: var(--navy);
+        text-decoration: underline;
+        cursor: pointer;
+        font-size: 12px;
+        padding: 0;
+    }
+
+    hr.sep {
+        border: none;
+        border-top: 1px solid var(--line);
+        margin: 14px 0;
+    }
+
+    .muted {
+        color: var(--muted);
+    }
+
+    .small {
+        font-size: 11.5px;
+    }
+
+    .approval-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--line);
+        gap: 10px;
+    }
+
+    .approval-row:last-child {
+        border-bottom: none;
+    }
+</style>
+
+<div class="app">
+    <div class="topbar">
+        <h1>SIPGN &amp; Laporan Keuangan SPPG — Sistem Terpadu</h1>
+        <p id="subhead">Bantu isi form Pengadaan (SCM) SIPGN + auto-generate BKU, buku pembantu &amp; approval keuangan
+        </p>
+    </div>
+    <div class="tabs" id="tabs"></div>
+    <div class="content" id="content"></div>
+</div>
+
+<script>
+    const TABS = [
+        { id: 'dashboard', label: 'Dashboard' },
+        { id: 'approval', label: 'Approval & Digest' },
+        { id: 'setup', label: 'Setup' },
+        { id: 'transaksi', label: 'Transaksi' },
+        { id: 'ocr', label: 'OCR Struk' },
+        { id: 'sipgn', label: 'SIPGN Helper' },
+        { id: 'kas', label: 'Kas & Pembayaran' },
+        { id: 'pajak', label: 'Pajak & Upah' },
+        { id: 'buku', label: 'Buku Otomatis' },
+        { id: 'laporan', label: 'Laporan' },
+    ];
+
+    const DEFAULT_COA = [
+        { kode: '1000', nama: 'Kas Kecil (Petty Cash)', kategori: 'Kas' },
+        { kode: '1100', nama: 'Kas di Bank', kategori: 'Kas' },
+        { kode: '2000', nama: 'Dana Bahan Makanan (Masuk)', kategori: 'Dana Masuk' },
+        { kode: '2010', nama: 'Biaya Bahan Makanan', kategori: 'Biaya Bahan Baku' },
+        { kode: '2100', nama: 'Dana Operasional (Masuk)', kategori: 'Dana Masuk' },
+        { kode: '2110', nama: 'Biaya Operasional', kategori: 'Biaya Operasional' },
+        { kode: '2150', nama: 'Dana Insentif Fasilitas (Masuk)', kategori: 'Dana Masuk' },
+        { kode: '2160', nama: 'Biaya Insentif Fasilitas / Upah', kategori: 'Biaya Fasilitas' },
+        { kode: '2170', nama: 'PPN', kategori: 'Pajak' },
+        { kode: '2180', nama: 'PPh 21/22/23', kategori: 'Pajak' },
+        { kode: '2190', nama: 'PPh Pasal 4(2)', kategori: 'Pajak' },
+    ];
+
+    const JENIS_PEKERJAAN = [
+        { label: 'Pencuci Alat Makan', tarif: 200000 },
+        { label: 'Asisten Lapangan', tarif: 100000 },
+        { label: 'Persiapan Bahan Makanan', tarif: 120000 },
+        { label: 'Pengolahan/Memasak', tarif: 100000 },
+        { label: 'Pemorsian', tarif: 100000 },
+        { label: 'Distribusi', tarif: 50000 },
+        { label: 'Keamanan', tarif: 100000 },
+        { label: 'Petugas Kebersihan', tarif: 100000 },
+        { label: 'Penanggung Jawab (Honorarium)', tarif: 50000 },
+    ];
+
+    let DB = {
+        setup: {
+            namaSPPG: '', namaYayasan: '', kepalaSPPG: '', akuntan: '', alamat: '', rekening: '',
+            approvalThreshold: 500000, periodeMulai: '', periodeSelesai: '',
+            reviewed: false, reviewedBy: '', reviewedAt: ''
+        },
+        coa: DEFAULT_COA.slice(),
+        pemasok: [],
+        transaksi: [],
+        pembelian: [],
+        anggaran: { periode: '', bahanMakanan: 0, operasional: 0, insentifFasilitas: 0 },
+        approvals: [],
+        batch: [],
+        nominatif: [],
+    };
+
+    let activeTab = 'dashboard';
+    let bukuSubtab = 'bku';
+    let draftPembelian = null; // in-progress pembelian form
+    let editingPembelianId = null;
+    let ocrBusy = false;
+
+    // ---------- storage helpers ----------
+    async function loadAll() {
+        const keys = ['setup', 'coa', 'pemasok', 'transaksi', 'pembelian', 'anggaran', 'approvals', 'batch', 'nominatif'];
+        for (const k of keys) {
+            try {
+                let val = null;
+                if (typeof window.storage !== 'undefined' && window.storage && typeof window.storage.get === 'function') {
+                    const r = await window.storage.get(k, false);
+                    if (r && r.value) val = r.value;
+                } else if (typeof localStorage !== 'undefined') {
+                    val = localStorage.getItem('sipgn_' + k);
+                }
+                if (val) {
+                    DB[k] = JSON.parse(val);
+                }
+            } catch (e) { /* key not found yet, keep default */ }
+        }
+        if (!DB.coa || DB.coa.length === 0) DB.coa = DEFAULT_COA.slice();
+        if (DB.setup.approvalThreshold === undefined) DB.setup.approvalThreshold = 500000;
+    }
+    async function save(key) {
+        try {
+            if (typeof window.storage !== 'undefined' && window.storage && typeof window.storage.set === 'function') {
+                await window.storage.set(key, JSON.stringify(DB[key]), false);
+            } else if (typeof localStorage !== 'undefined') {
+                localStorage.setItem('sipgn_' + key, JSON.stringify(DB[key]));
+            }
+        } catch (e) { console.error('storage save failed', key, e); }
+    }
+    function toast(msg) {
+        const t = document.createElement('div');
+        t.className = 'toast'; t.textContent = msg;
+        document.body.appendChild(t);
+        setTimeout(() => t.remove(), 2600);
+    }
+    function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+    function todayStr() { return new Date().toISOString().slice(0, 10); }
+    function rupiah(n) { n = Number(n) || 0; return 'Rp ' + n.toLocaleString('id-ID'); }
+    function fmtDate(d) { if (!d) return '-'; const dt = new Date(d); return dt.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }); }
+    function coaByKode(k) { return DB.coa.find(c => c.kode === k); }
+    function coaOptions(filterKategori) {
+        return DB.coa.filter(c => !filterKategori || filterKategori.includes(c.kategori))
+            .map(c => `<option value="${c.kode}">${c.kode} - ${c.nama}</option>`).join('');
+    }
+    function pemasokOptions(selId) {
+        if (DB.pemasok.length === 0) return '<option value="">(belum ada pemasok)</option>';
+        return DB.pemasok.map(p => `<option value="${p.id}" ${p.id === selId ? 'selected' : ''}>${p.nama}</option>`).join('');
+    }
+    function downloadCSV(filename, headers, rows) {
+        let csv = headers.join(';') + '\n';
+        rows.forEach(r => { csv += r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(';') + '\n'; });
+        const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = filename; a.click();
+        URL.revokeObjectURL(url);
+    }
+    function val(id) { const el = document.getElementById(id); return el ? el.value.trim() : ''; }
+
+    // ---------- image helpers (untuk OCR) ----------
+    function fileToImage(file) {
+        return new Promise((res, rej) => {
+            const url = URL.createObjectURL(file);
+            const img = new Image();
+            img.onload = () => { URL.revokeObjectURL(url); res(img); };
+            img.onerror = rej;
+            img.src = url;
+        });
+    }
+    function imageToBase64(img, maxWidth, quality) {
+        const scale = Math.min(1, maxWidth / img.width);
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        return canvas.toDataURL('image/jpeg', quality).split(',')[1];
+    }
+    async function extractReceiptJSON(fullB64) {
+        const prompt = 'Ekstrak data dari foto struk/nota belanja ini. Balas HANYA dengan JSON valid, tanpa teks lain, tanpa markdown, format persis: {"tanggal":"YYYY-MM-DD","vendor":"nama toko","items":[{"nama":"nama barang","jumlah":1,"harga":0}],"total":0}. Jika tanggal tidak jelas terbaca, gunakan tanggal hari ini (' + todayStr() + '). Angka harga/total tanpa titik/koma pemisah ribuan.';
+        const resp = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                model: 'claude-sonnet-4-6', max_tokens: 1000,
+                messages: [{
+                    role: 'user', content: [
+                        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: fullB64 } },
+                        { type: 'text', text: prompt }
+                    ]
+                }]
+            })
+        });
+        const data = await resp.json();
+        const textBlock = (data.content || []).find(b => b.type === 'text');
+        if (!textBlock) throw new Error('Tidak ada respons teks dari model');
+        const clean = textBlock.text.replace(/```json|```/g, '').trim();
+        return JSON.parse(clean);
+    }
+
+    // ---------- shared OCR queue (dipakai bersama tim, shared=true) ----------
+    let ocrQueueCache = [];
+    async function loadOcrQueue() {
+        try {
+            let val = null;
+            if (typeof window.storage !== 'undefined' && window.storage && typeof window.storage.get === 'function') {
+                const r = await window.storage.get('ocrQueue', true);
+                if (r && r.value) val = r.value;
+            } else if (typeof localStorage !== 'undefined') {
+                val = localStorage.getItem('sipgn_ocrQueue');
+            }
+            ocrQueueCache = val ? JSON.parse(val) : [];
+        } catch (e) { ocrQueueCache = []; }
+    }
+    async function saveOcrQueue() {
+        try {
+            if (typeof window.storage !== 'undefined' && window.storage && typeof window.storage.set === 'function') {
+                await window.storage.set('ocrQueue', JSON.stringify(ocrQueueCache), true);
+            } else if (typeof localStorage !== 'undefined') {
+                localStorage.setItem('sipgn_ocrQueue', JSON.stringify(ocrQueueCache));
+            }
+        } catch (e) { console.error('gagal simpan antrean OCR', e); }
+    }
+    async function refreshOcrQueue() {
+        await loadOcrQueue();
+        const el = document.getElementById('ocrQueueList');
+        if (el) el.innerHTML = renderOcrQueueListHtml();
+    }
+    function gotoSipgnTab() { activeTab = 'sipgn'; render(); }
+
+    // ---------- approval helpers ----------
+    function isCounted(t) { return !t.approvalStatus || t.approvalStatus === 'approved'; }
+    function needsApprovalAmount(jumlah) {
+        const th = Number(DB.setup.approvalThreshold) || 0;
+        return th > 0 && jumlah >= th;
+    }
+    function addApproval(type, payload) {
+        DB.approvals.push({
+            id: uid(), type, status: 'pending', tanggal: todayStr(),
+            deskripsi: payload.deskripsi || '', jumlah: payload.jumlah || 0,
+            linkedTransaksiId: payload.linkedTransaksiId || null, batchId: payload.batchId || null
+        });
+        save('approvals');
+    }
+    function pendingApprovals() { return DB.approvals.filter(a => a.status === 'pending'); }
+    function approveApproval(id) {
+        const a = DB.approvals.find(x => x.id === id); if (!a) return;
+        if (a.linkedTransaksiId) {
+            const t = DB.transaksi.find(x => x.id === a.linkedTransaksiId);
+            if (t) t.approvalStatus = 'approved';
+            save('transaksi');
+        }
+        if (a.batchId) {
+            const b = DB.batch.find(x => x.id === a.batchId);
+            if (b) {
+                b.status = 'approved';
+                DB.transaksi.push({
+                    id: uid(), tanggal: todayStr(), noBukti: 'BATCH-' + b.id.slice(-6),
+                    uraian: (b.jenis === 'upah' ? 'Pembayaran Upah - ' : 'Pembayaran Vendor - ') + b.penerima,
+                    akunKas: b.akunKas, akunLawan: b.akunLawan, tipe: 'K', jumlah: b.jumlah,
+                    keterangan: 'Jatuh tempo ' + fmtDate(b.jatuhTempo), sumber: 'batch', approvalStatus: 'approved'
+                });
+                save('transaksi'); save('batch');
+            }
+        }
+        a.status = 'approved'; save('approvals'); render();
+        toast('Disetujui');
+    }
+    function rejectApproval(id) {
+        const a = DB.approvals.find(x => x.id === id); if (!a) return;
+        if (a.linkedTransaksiId) {
+            const t = DB.transaksi.find(x => x.id === a.linkedTransaksiId);
+            if (t) t.approvalStatus = 'rejected';
+            save('transaksi');
+        }
+        if (a.batchId) {
+            const b = DB.batch.find(x => x.id === a.batchId);
+            if (b) { b.status = 'ditolak'; save('batch'); }
+        }
+        a.status = 'rejected'; save('approvals'); render();
+        toast('Ditolak');
+    }
+
+    // ---------- ledger computations (hanya transaksi yang lolos approval) ----------
+    function sortedTransaksi() {
+        return DB.transaksi.filter(isCounted).slice().sort((a, b) => a.tanggal.localeCompare(b.tanggal) || a.id.localeCompare(b.id));
+    }
+    function allTransaksiSorted() {
+        return DB.transaksi.slice().sort((a, b) => a.tanggal.localeCompare(b.tanggal) || a.id.localeCompare(b.id));
+    }
+    function ledgerForKas(kodeKas) {
+        let saldo = 0; const rows = [];
+        sortedTransaksi().filter(t => t.akunKas === kodeKas).forEach(t => {
+            const d = t.tipe === 'D' ? t.jumlah : 0;
+            const k = t.tipe === 'K' ? t.jumlah : 0;
+            saldo += d - k;
+            rows.push({ ...t, d, k, saldo });
+        });
+        return rows;
+    }
+    function ledgerAllKas() {
+        let saldo = 0; const rows = [];
+        sortedTransaksi().forEach(t => {
+            const d = t.tipe === 'D' ? t.jumlah : 0;
+            const k = t.tipe === 'K' ? t.jumlah : 0;
+            saldo += d - k;
+            rows.push({ ...t, d, k, saldo });
+        });
+        return rows;
+    }
+    function ledgerBP(kodeMasuk, kodeBiaya) {
+        let saldo = 0; const rows = [];
+        sortedTransaksi().filter(t => t.akunLawan === kodeMasuk || t.akunLawan === kodeBiaya).forEach(t => {
+            const masuk = (t.akunLawan === kodeMasuk && t.tipe === 'D') ? t.jumlah : 0;
+            const keluar = (t.akunLawan === kodeBiaya && t.tipe === 'K') ? t.jumlah : 0;
+            saldo += masuk - keluar;
+            rows.push({ ...t, masuk, keluar, saldo });
+        });
+        return rows;
+    }
+    function saldoAkhirKasTotal() {
+        const kasKodes = DB.coa.filter(c => c.kategori === 'Kas').map(c => c.kode);
+        let total = 0;
+        kasKodes.forEach(k => { const l = ledgerForKas(k); total += l.length ? l[l.length - 1].saldo : 0; });
+        return total;
+    }
+    function saldoBP(kodeMasuk, kodeBiaya) { const l = ledgerBP(kodeMasuk, kodeBiaya); return l.length ? l[l.length - 1].saldo : 0; }
+    function sumBiaya(kode) {
+        return sortedTransaksi().filter(t => t.akunLawan === kode && t.tipe === 'K').reduce((s, t) => s + t.jumlah, 0);
+    }
+
+    // ---------- render root ----------
+    function render() {
+        const tabsEl = document.getElementById('tabs');
+        const pendingCount = pendingApprovals().length;
+        tabsEl.innerHTML = TABS.map(t => `<button class="tab ${t.id === activeTab ? 'active' : ''}" onclick="setTab('${t.id}')">${t.label}${t.id === 'approval' && pendingCount ? ' (' + pendingCount + ')' : ''}</button>`).join('');
+        const c = document.getElementById('content');
+        if (activeTab === 'dashboard') c.innerHTML = renderDashboard();
+        else if (activeTab === 'approval') c.innerHTML = renderApproval();
+        else if (activeTab === 'setup') c.innerHTML = renderSetup();
+        else if (activeTab === 'transaksi') c.innerHTML = renderTransaksi();
+        else if (activeTab === 'ocr') c.innerHTML = renderOcr();
+        else if (activeTab === 'sipgn') c.innerHTML = renderSipgn();
+        else if (activeTab === 'kas') c.innerHTML = renderKas();
+        else if (activeTab === 'pajak') c.innerHTML = renderPajak();
+        else if (activeTab === 'buku') c.innerHTML = renderBuku();
+        else if (activeTab === 'laporan') c.innerHTML = renderLaporan();
+    }
+    function setTab(id) {
+        activeTab = id; draftPembelian = null; render();
+        if (id === 'ocr') refreshOcrQueue();
+    }
+
+    // ---------- DASHBOARD ----------
+    function renderDashboard() {
+        const totalKas = saldoAkhirKasTotal();
+        const jmlTransaksi = DB.transaksi.length;
+        const jmlDraft = DB.pembelian.filter(p => p.status === 'draft').length;
+        const jmlTerkirim = DB.pembelian.filter(p => p.status === 'terkirim').length;
+        const pend = pendingApprovals().length;
+        return `
+  <div class="grid c4" style="margin-bottom:16px;">
+    <div class="kpi"><div class="num">${rupiah(totalKas)}</div><div class="lbl">Saldo Kas (BKU)</div></div>
+    <div class="kpi"><div class="num">${jmlTransaksi}</div><div class="lbl">Total Transaksi</div></div>
+    <div class="kpi"><div class="num" style="${pend ? 'color:var(--warn)' : ''}">${pend}</div><div class="lbl">Menunggu Approval</div></div>
+    <div class="kpi"><div class="num">${jmlDraft}/${jmlTerkirim}</div><div class="lbl">Pembelian Draft/Terkirim</div></div>
+  </div>
+  ${pend ? `<div class="note">${pend} item menunggu persetujuan. <button class="link-btn" onclick="setTab('approval')">Buka Approval →</button></div>` : ''}
+  <div class="card">
+    <h2>Alur kerja</h2>
+    <ol class="small" style="margin:0;padding-left:18px;line-height:1.9;">
+      <li>Setup — profil &amp; anggaran</li>
+      <li>SIPGN Helper / OCR Struk — catat pembelian</li>
+      <li>Transaksi — catat kas masuk/keluar lain</li>
+      <li>Approval — setujui yang menunggu</li>
+      <li>Buku Otomatis &amp; Laporan — otomatis dari transaksi tersetujui</li>
+    </ol>
+  </div>
+  `;
+    }
+
+    // ---------- APPROVAL & DIGEST (Orchestrator-lite) ----------
+    function renderApproval() {
+        const pend = DB.approvals.filter(a => a.status === 'pending').slice().reverse();
+        const hist = DB.approvals.filter(a => a.status !== 'pending').slice().reverse().slice(0, 20);
+        const typeLabel = { transaksi: 'Transaksi besar', pembelian: 'Pembelian SIPGN', batch: 'Pembayaran batch', vendorBaru: 'Pemasok baru' };
+        return `
+  <div class="card">
+    <h2>Approval &amp; Digest</h2>
+    <p class="sub">Setujui atau tolak yang menunggu.</p>
+    ${pend.length === 0 ? '<div class="empty">Tidak ada yang menunggu. 👍</div>' : pend.map(a => `
+      <div class="approval-row">
+        <div>
+          <span class="badge badge-warn">${typeLabel[a.type] || a.type}</span>
+          <b style="margin-left:6px;">${a.deskripsi}</b>
+          <div class="small muted">${fmtDate(a.tanggal)} ${a.jumlah ? '· ' + rupiah(a.jumlah) : ''}</div>
+        </div>
+        <div class="row-actions">
+          <button class="btn btn-outline btn-sm" onclick="rejectApproval('${a.id}')">Tolak</button>
+          <button class="btn btn-gold btn-sm" onclick="approveApproval('${a.id}')">Setujui</button>
+        </div>
+      </div>`).join('')}
+  </div>
+  <div class="card">
+    <h2>Riwayat Keputusan</h2>
+    ${hist.length === 0 ? '<div class="empty">Belum ada riwayat.</div>' : `
+    <table><thead><tr><th>Tanggal</th><th>Jenis</th><th>Deskripsi</th><th class="right">Jumlah</th><th>Status</th></tr></thead>
+    <tbody>${hist.map(a => `<tr><td>${fmtDate(a.tanggal)}</td><td>${typeLabel[a.type] || a.type}</td><td>${a.deskripsi}</td>
+      <td class="right">${a.jumlah ? rupiah(a.jumlah) : '-'}</td>
+      <td>${a.status === 'approved' ? '<span class="badge badge-ok">Disetujui</span>' : '<span class="badge badge-bad">Ditolak</span>'}</td></tr>`).join('')}
+    </tbody></table>`}
+  </div>
+  `;
+    }
+
+    // ---------- SETUP ----------
+    function renderSetup() {
+        const s = DB.setup, a = DB.anggaran;
+        return `
+  <div class="card">
+    <h2>Profil SPPG</h2>
+        <div class="grid c2">
+      <div class="field"><label>Nama SPPG</label><input id="f_namaSPPG" value="${s.namaSPPG || ''}"></div>
+      <div class="field"><label>Nama Yayasan / Lembaga</label><input id="f_namaYayasan" value="${s.namaYayasan || ''}"></div>
+      <div class="field"><label>Nama Kepala SPPG</label><input id="f_kepalaSPPG" value="${s.kepalaSPPG || ''}"></div>
+      <div class="field"><label>Nama Akuntan / PLOK</label><input id="f_akuntan" value="${s.akuntan || ''}"></div>
+      <div class="field"><label>Nomor Rekening / VA</label><input id="f_rekening" value="${s.rekening || ''}"></div>
+      <div class="field"><label>Alamat</label><input id="f_alamat" value="${s.alamat || ''}"></div>
+    </div>
+    <button class="btn btn-primary" onclick="saveSetup()">Simpan Profil</button>
+  </div>
+
+  <div class="card">
+    <h2>Ambang Approval &amp; Periode</h2>
+        <div class="grid c3">
+      <div class="field"><label>Ambang Approval (Rp)</label><input id="f_threshold" type="number" value="${s.approvalThreshold || 0}"></div>
+      <div class="field"><label>Periode Mulai</label><input id="f_periodeMulai" type="date" value="${s.periodeMulai || ''}"></div>
+      <div class="field"><label>Periode Selesai</label><input id="f_periodeSelesai" type="date" value="${s.periodeSelesai || ''}"></div>
+    </div>
+    <button class="btn btn-primary" onclick="saveSetup()">Simpan</button>
+  </div>
+
+  <div class="card">
+    <h2>Anggaran Periode Berjalan</h2>
+        <div class="grid c4">
+      <div class="field"><label>Nama Periode</label><input id="f_periode" placeholder="cth: Mei 2026" value="${a.periode || ''}"></div>
+      <div class="field"><label>Anggaran Bahan Makanan</label><input id="f_angBahan" type="number" value="${a.bahanMakanan || 0}"></div>
+      <div class="field"><label>Anggaran Operasional</label><input id="f_angOps" type="number" value="${a.operasional || 0}"></div>
+      <div class="field"><label>Anggaran Insentif Fasilitas</label><input id="f_angFas" type="number" value="${a.insentifFasilitas || 0}"></div>
+    </div>
+    <button class="btn btn-primary" onclick="saveAnggaran()">Simpan Anggaran</button>
+  </div>
+
+  <div class="card">
+    <h2>Daftar Pemasok</h2>
+        <div class="grid c3">
+      <div class="field"><label>Nama Pemasok / Toko</label><input id="p_nama" placeholder="cth: Koperasi Desa Merah Putih"></div>
+      <div class="field"><label>Nomor HP</label><input id="p_kontak" placeholder="+62..."></div>
+      <div class="field"><label>Alamat</label><input id="p_alamat" placeholder="Alamat pemasok"></div>
+    </div>
+    <button class="btn btn-gold" onclick="addPemasok()">+ Tambah Pemasok</button>
+    <hr class="sep">
+    ${DB.pemasok.length === 0 ? '<div class="empty">Belum ada pemasok.</div>' : `
+    <table><thead><tr><th>Nama</th><th>Kontak</th><th>Alamat</th><th></th></tr></thead>
+    <tbody>
+      ${DB.pemasok.map(p => `<tr><td>${p.nama}</td><td>${p.kontak || '-'}</td><td>${p.alamat || '-'}</td>
+      <td><button class="link-btn" onclick="delPemasok('${p.id}')">hapus</button></td></tr>`).join('')}
+    </tbody></table>`}
+  </div>
+  `;
+    }
+    function saveSetup() {
+        DB.setup = {
+            ...DB.setup,
+            namaSPPG: val('f_namaSPPG') || DB.setup.namaSPPG, namaYayasan: val('f_namaYayasan') || DB.setup.namaYayasan,
+            kepalaSPPG: val('f_kepalaSPPG') || DB.setup.kepalaSPPG, akuntan: val('f_akuntan') || DB.setup.akuntan,
+            rekening: val('f_rekening') || DB.setup.rekening, alamat: val('f_alamat') || DB.setup.alamat,
+            approvalThreshold: document.getElementById('f_threshold') ? Number(val('f_threshold')) || 0 : DB.setup.approvalThreshold,
+            periodeMulai: document.getElementById('f_periodeMulai') ? val('f_periodeMulai') : DB.setup.periodeMulai,
+            periodeSelesai: document.getElementById('f_periodeSelesai') ? val('f_periodeSelesai') : DB.setup.periodeSelesai,
+        };
+        save('setup'); toast('Profil / pengaturan disimpan');
+    }
+    function saveAnggaran() {
+        DB.anggaran = {
+            periode: val('f_periode'),
+            bahanMakanan: Number(val('f_angBahan')) || 0,
+            operasional: Number(val('f_angOps')) || 0,
+            insentifFasilitas: Number(val('f_angFas')) || 0,
+        };
+        save('anggaran'); toast('Anggaran disimpan');
+    }
+    function addPemasok() {
+        const nama = val('p_nama'); if (!nama) { toast('Nama pemasok wajib diisi'); return; }
+        DB.pemasok.push({ id: uid(), nama, kontak: val('p_kontak'), alamat: val('p_alamat') });
+        save('pemasok');
+        addApproval('vendorBaru', { deskripsi: 'Pemasok baru: ' + nama, jumlah: 0 });
+        render();
+        toast('Pemasok ditambahkan (tercatat di Approval & Digest)');
+    }
+    function delPemasok(id) {
+        DB.pemasok = DB.pemasok.filter(p => p.id !== id);
+        save('pemasok'); render();
+    }
+
+    // ---------- TRANSAKSI ----------
+    function renderTransaksi() {
+        const kasOpt = coaOptions(['Kas']);
+        const lawanOpt = coaOptions(['Dana Masuk', 'Biaya Bahan Baku', 'Biaya Operasional', 'Biaya Fasilitas', 'Pajak']);
+        const rows = allTransaksiSorted().slice().reverse();
+        return `
+  <div class="card">
+    <h2>Input Transaksi</h2>
+    <p class="sub">Debit = dana masuk. Kredit = pengeluaran. Bisa juga catat lewat <button class="link-btn" onclick="setTab('ocr')">OCR Struk</button>.</p>
+    <div class="grid c4">
+      <div class="field"><label>Tanggal</label><input id="t_tanggal" type="date" value="${todayStr()}"></div>
+      <div class="field"><label>No. Bukti</label><input id="t_noBukti" placeholder="otomatis jika kosong"></div>
+      <div class="field"><label>Akun Kas</label><select id="t_akunKas">${kasOpt}</select></div>
+      <div class="field"><label>Tipe</label><select id="t_tipe"><option value="D">Debit (masuk)</option><option value="K">Kredit (keluar)</option></select></div>
+      <div class="field" style="grid-column:span 2;"><label>Uraian</label><input id="t_uraian" placeholder="cth: Pencairan dana bahan makanan tahap 1"></div>
+      <div class="field"><label>Akun Lawan</label><select id="t_akunLawan">${lawanOpt}</select></div>
+      <div class="field"><label>Jumlah (Rp)</label><input id="t_jumlah" type="number" placeholder="0"></div>
+      <div class="field" style="grid-column:span 4;"><label>Keterangan</label><input id="t_keterangan" placeholder="opsional"></div>
+    </div>
+    <button class="btn btn-primary" onclick="addTransaksi()">+ Simpan Transaksi</button>
+  </div>
+  <div class="card">
+    <h2>Daftar Transaksi <span class="muted small">(${DB.transaksi.length})</span></h2>
+    ${rows.length === 0 ? '<div class="empty">Belum ada transaksi.</div>' : `
+    <table><thead><tr><th>Tanggal</th><th>No Bukti</th><th>Uraian</th><th>Akun Kas</th><th>Akun Lawan</th><th class="right">Debit</th><th class="right">Kredit</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+      ${rows.map(t => `<tr>
+        <td>${fmtDate(t.tanggal)}</td><td>${t.noBukti || '-'}</td><td>${t.uraian}</td>
+        <td>${coaByKode(t.akunKas)?.nama || t.akunKas}</td><td>${coaByKode(t.akunLawan)?.nama || t.akunLawan}</td>
+        <td class="right">${t.tipe === 'D' ? rupiah(t.jumlah) : '-'}</td>
+        <td class="right">${t.tipe === 'K' ? rupiah(t.jumlah) : '-'}</td>
+        <td>${statusBadge(t)}</td>
+        <td><button class="link-btn" onclick="delTransaksi('${t.id}')">hapus</button></td>
+      </tr>`).join('')}
+    </tbody></table>`}
+  </div>
+  `;
+    }
+    function statusBadge(t) {
+        if (t.approvalStatus === 'pending') return '<span class="badge badge-warn">Menunggu Approval</span>';
+        if (t.approvalStatus === 'rejected') return '<span class="badge badge-bad">Ditolak</span>';
+        if (t.sumber === 'sipgn') return '<span class="badge badge-ok">SIPGN</span>';
+        if (t.sumber === 'batch') return '<span class="badge badge-ok">Batch</span>';
+        return '<span class="badge badge-ok">Tercatat</span>';
+    }
+    function addTransaksi() {
+        const tanggal = val('t_tanggal'), uraian = val('t_uraian'), jumlah = Number(val('t_jumlah')) || 0;
+        const tipe = val('t_tipe');
+        if (!tanggal || !uraian || !jumlah) { toast('Tanggal, uraian, dan jumlah wajib diisi'); return; }
+        const id = uid();
+        const needApp = tipe === 'K' && needsApprovalAmount(jumlah);
+        DB.transaksi.push({
+            id, tanggal, noBukti: val('t_noBukti') || ('TRX-' + (DB.transaksi.length + 1)),
+            uraian, akunKas: val('t_akunKas'), akunLawan: val('t_akunLawan'),
+            tipe, jumlah, keterangan: val('t_keterangan'), sumber: 'manual',
+            approvalStatus: needApp ? 'pending' : 'approved'
+        });
+        save('transaksi');
+        if (needApp) addApproval('transaksi', { linkedTransaksiId: id, deskripsi: uraian, jumlah });
+        render();
+        toast(needApp ? 'Disimpan — menunggu approval (jumlah di atas ambang)' : 'Transaksi disimpan');
+    }
+    function delTransaksi(id) {
+        DB.transaksi = DB.transaksi.filter(t => t.id !== id);
+        save('transaksi'); render();
+    }
+
+    // ---------- OCR STRUK (TIM) ----------
+    function renderOcr() {
+        const s = DB.setup;
+        return `
+  <div class="card">
+    <h2>OCR Struk</h2>
+    <p class="sub">Foto struk, AI baca otomatis, tim bisa kirim dari HP masing-masing.</p>
+    <div class="grid c2">
+      <div class="field"><label>Nama Kamu</label><input id="ocrq_nama" value="${s.namaPengirimDefault || ''}" placeholder="cth: Budi (Gudang)"></div>
+      <div class="field"><label>Foto Struk/Nota</label><input type="file" id="ocrq_file" accept="image/*" capture="environment"></div>
+    </div>
+    <button class="btn btn-gold" id="ocrq_btn" onclick="submitOcrQueue()">📷 Baca &amp; Kirim</button>
+  </div>
+  <div class="card">
+    <h2>Antrean</h2>
+    <div id="ocrQueueList" class="empty">Memuat...</div>
+  </div>
+  `;
+    }
+    function renderOcrQueueListHtml() {
+        const pending = ocrQueueCache.filter(o => o.status === 'baru').slice().reverse();
+        const done = ocrQueueCache.filter(o => o.status === 'selesai').slice().reverse().slice(0, 10);
+        if (pending.length === 0 && done.length === 0) return '<div class="empty">Belum ada struk yang dikirim tim.</div>';
+        let html = '';
+        if (pending.length) {
+            html += pending.map(o => {
+                const e = o.extracted || {};
+                const total = Number(e.total) || 0;
+                return `<div class="approval-row" style="align-items:flex-start;">
+        <div style="display:flex;gap:10px;">
+          ${o.thumb ? `<img src="data:image/jpeg;base64,${o.thumb}" style="width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid var(--line);">` : ''}
+          <div>
+            <b>${e.vendor || 'Vendor tidak terbaca'}</b> · ${rupiah(total)}
+            <div class="small muted">Dikirim oleh ${o.submittedBy || '-'} · ${fmtDate(o.tanggalKirim)} · struk tgl ${fmtDate(e.tanggal)}</div>
+            <div class="small muted">${(e.items || []).map(i => i.nama + ' x' + i.jumlah).join(', ') || '-'}</div>
+          </div>
+        </div>
+        <div class="row-actions" style="flex-wrap:wrap;">
+          <button class="btn btn-outline btn-sm" onclick="ocrToTransaksi('${o.id}')">Catat Transaksi</button>
+          <button class="btn btn-outline btn-sm" onclick="ocrToPembelian('${o.id}')">Draft Pembelian SIPGN</button>
+          <button class="link-btn" onclick="ocrDelete('${o.id}')">hapus</button>
+        </div>
+      </div>`;
+            }).join('');
+        } else {
+            html += '<div class="empty">Tidak ada yang menunggu diproses.</div>';
+        }
+        if (done.length) {
+            html += '<hr class="sep"><div class="small muted" style="margin-bottom:6px;"><b>Sudah diproses (10 terbaru):</b></div>';
+            html += done.map(o => {
+                const e = o.extracted || {};
+                return `<div class="small muted" style="padding:4px 0;">${fmtDate(o.tanggalKirim)} · ${e.vendor || '-'} · ${rupiah(Number(e.total) || 0)} · oleh ${o.submittedBy || '-'}</div>`;
+            }).join('');
+        }
+        return html;
+    }
+    async function submitOcrQueue() {
+        const fileInput = document.getElementById('ocrq_file');
+        if (!fileInput.files[0]) { toast('Ambil atau pilih foto dulu'); return; }
+        const namaPengirim = val('ocrq_nama');
+        if (!namaPengirim) { toast('Isi nama kamu dulu'); return; }
+        DB.setup.namaPengirimDefault = namaPengirim; save('setup');
+        const btn = document.getElementById('ocrq_btn');
+        btn.textContent = 'Membaca...'; btn.disabled = true;
+        try {
+            const file = fileInput.files[0];
+            const img = await fileToImage(file);
+            const fullB64 = imageToBase64(img, 1200, 0.75);
+            const thumbB64 = imageToBase64(img, 380, 0.5);
+            const parsed = await extractReceiptJSON(fullB64);
+            await loadOcrQueue();
+            ocrQueueCache.push({
+                id: uid(), submittedBy: namaPengirim, tanggalKirim: todayStr(),
+                thumb: thumbB64, status: 'baru', extracted: parsed
+            });
+            await saveOcrQueue();
+            fileInput.value = '';
+            toast('Terkirim ke antrean tim');
+            const el = document.getElementById('ocrQueueList');
+            if (el) el.innerHTML = renderOcrQueueListHtml();
+        } catch (e) {
+            console.error(e);
+            toast('Gagal membaca struk — coba foto yang lebih jelas/terang');
+        } finally {
+            btn.textContent = '📷 Baca & Kirim ke Antrean Tim'; btn.disabled = false;
+        }
+    }
+    function ocrToTransaksi(id) {
+        const item = ocrQueueCache.find(o => o.id === id); if (!item) return;
+        const e = item.extracted || {};
+        const total = Number(e.total) || 0;
+        const trxId = uid();
+        const needApp = needsApprovalAmount(total);
+        const kasKode = (DB.coa.find(c => c.kategori === 'Kas') || {}).kode || '1000';
+        DB.transaksi.push({
+            id: trxId, tanggal: e.tanggal || todayStr(), noBukti: 'OCR-' + item.id.slice(-6),
+            uraian: 'Pembelian - ' + (e.vendor || 'toko tidak dikenal'),
+            akunKas: kasKode, akunLawan: '2010', tipe: 'K', jumlah: total,
+            keterangan: (e.items || []).map(i => i.nama + ' x' + i.jumlah).join(', '),
+            sumber: 'ocr', approvalStatus: needApp ? 'pending' : 'approved'
+        });
+        save('transaksi');
+        if (needApp) addApproval('transaksi', { linkedTransaksiId: trxId, deskripsi: 'Struk dari ' + (e.vendor || '-') + ' (via ' + item.submittedBy + ')', jumlah: total });
+        item.status = 'selesai';
+        saveOcrQueue();
+        toast('Tercatat sebagai transaksi — cek akun kas/biaya di tab Transaksi kalau perlu diubah');
+        const el = document.getElementById('ocrQueueList');
+        if (el) el.innerHTML = renderOcrQueueListHtml();
+    }
+    function ocrToPembelian(id) {
+        const item = ocrQueueCache.find(o => o.id === id); if (!item) return;
+        const e = item.extracted || {};
+        const vendorKey = (e.vendor || '').toLowerCase().split(' ')[0];
+        const match = vendorKey ? DB.pemasok.find(p => p.nama.toLowerCase().includes(vendorKey)) : null;
+        draftPembelian = {
+            id: uid(), tanggalTransaksi: e.tanggal || todayStr(), tanggalDiterima: e.tanggal || todayStr(),
+            pemasokId: match ? match.id : '', akunKas: (DB.coa.find(c => c.kategori === 'Kas') || {}).kode || '1000',
+            status: 'draft',
+            items: (e.items || []).map(i => ({
+                namaBarang: i.nama || '', kategori: '', harga: Number(i.harga) || 0,
+                jumlah: Number(i.jumlah) || 1, satuan: '', total: (Number(i.harga) || 0) * (Number(i.jumlah) || 1)
+            }))
+        };
+        editingPembelianId = null;
+        item.status = 'selesai';
+        saveOcrQueue();
+        toast('Draft pembelian dibuat dari struk — lengkapi pemasok/kategori lalu kirim');
+        gotoSipgnTab();
+    }
+    function ocrDelete(id) {
+        ocrQueueCache = ocrQueueCache.filter(o => o.id !== id);
+        saveOcrQueue();
+        const el = document.getElementById('ocrQueueList');
+        if (el) el.innerHTML = renderOcrQueueListHtml();
+        toast('Dihapus dari antrean');
+    }
+
+    // ---------- SIPGN HELPER ----------
+    function newDraft() {
+        return {
+            id: uid(), tanggalTransaksi: todayStr(), tanggalDiterima: todayStr(),
+            pemasokId: '', items: [], status: 'draft', akunKas: '1000', buktiUploaded: false
+        };
+    }
+    function renderSipgn() {
+        const list = DB.pembelian.slice().reverse();
+        return `
+  <div class="grid c2" style="align-items:start;">
+    <div class="card">
+      <h2>Kebutuhan Bahan Baku (opsional)</h2>
+      <p class="sub">Opsional, untuk bantu perencanaan.</p>
+      ${renderKebutuhanBox()}
+    </div>
+    <div class="card">
+      <h2>Pembelian Langsung — form bantu</h2>
+      <p class="sub">Isi seperti form SIPGN, lalu salin ringkasannya ke situs asli.</p>
+      ${renderPembelianForm()}
+    </div>
+  </div>
+  <div class="card">
+    <h2>Riwayat Pembelian <span class="muted small">(${DB.pembelian.length})</span></h2>
+    ${list.length === 0 ? '<div class="empty">Belum ada pencatatan pembelian.</div>' : `
+    <table><thead><tr><th>Tgl Transaksi</th><th>Pemasok</th><th class="right">Total</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+      ${list.map(p => {
+            const pm = DB.pemasok.find(x => x.id === p.pemasokId);
+            const total = p.items.reduce((s, i) => s + i.total, 0);
+            return `<tr>
+          <td>${fmtDate(p.tanggalTransaksi)}</td><td>${pm ? pm.nama : '-'}</td>
+          <td class="right">${rupiah(total)}</td>
+          <td>${p.status === 'terkirim' ? '<span class="badge badge-ok">Terkirim</span>' : '<span class="badge badge-warn">Draft</span>'}</td>
+          <td class="row-actions">
+            <button class="link-btn" onclick="viewPembelian('${p.id}')">lihat</button>
+            ${p.status === 'draft' ? `<button class="link-btn" onclick="editPembelian('${p.id}')">edit</button>` : ''}
+            <button class="link-btn" onclick="delPembelian('${p.id}')">hapus</button>
+          </td>
+        </tr>`;
+        }).join('')}
+    </tbody></table>`}
+  </div>
+  <div id="pembelianDetail"></div>
+  `;
+    }
+    function renderKebutuhanBox() {
+        return `
+    <div class="grid c2">
+      <div class="field"><label>Bahan Baku</label><input id="k_nama" placeholder="cth: Beras Cerdas"></div>
+      <div class="field"><label>Total Kebutuhan (Kg)</label><input id="k_jumlah" type="number" placeholder="0"></div>
+    </div>
+    <button class="btn btn-outline btn-sm" onclick="addKebutuhan()">+ Tambah ke catatan</button>
+    <hr class="sep">
+    <div id="kebutuhanList">
+      ${(window._kebutuhan || []).length ? `<table><thead><tr><th>Bahan Baku</th><th class="right">Kg</th></tr></thead><tbody>
+        ${(window._kebutuhan || []).map((k, i) => `<tr><td>${k.nama}</td><td class="right">${k.jumlah}</td></tr>`).join('')}
+      </tbody></table>` : '<div class="empty small">Belum ada catatan kebutuhan.</div>'}
+    </div>
+  `;
+    }
+    function addKebutuhan() {
+        window._kebutuhan = window._kebutuhan || [];
+        const nama = val('k_nama'), jumlah = Number(val('k_jumlah')) || 0;
+        if (!nama) { toast('Isi nama bahan baku'); return; }
+        window._kebutuhan.push({ nama, jumlah });
+        render();
+    }
+
+    function renderPembelianForm() {
+        if (!draftPembelian) draftPembelian = newDraft();
+        const d = draftPembelian;
+        const total = d.items.reduce((s, i) => s + i.total, 0);
+        return `
+    <div class="grid c2">
+      <div class="field"><label>Tanggal Transaksi</label><input id="pb_tglTrx" type="date" value="${d.tanggalTransaksi}" onchange="syncDraftDates()"></div>
+      <div class="field"><label>Tanggal Diterima</label><input id="pb_tglTerima" type="date" value="${d.tanggalDiterima}"></div>
+    </div>
+    <div class="field">
+      <label>Nama Pemasok</label>
+      <div style="display:flex;gap:8px;">
+        <select id="pb_pemasok" style="flex:1;">${pemasokOptions(d.pemasokId)}</select>
+        <button class="btn btn-outline btn-sm" onclick="setTab('setup')">+ Pemasok</button>
+      </div>
+    </div>
+    <div class="field"><label>Sumber Kas (untuk pembukuan)</label><select id="pb_akunKas">${coaOptions(['Kas'])}</select></div>
+    <label>Daftar Barang</label>
+    <table class="item-table"><thead><tr><th>Nama Barang</th><th>Kategori</th><th>Harga</th><th>Jumlah</th><th>Satuan</th><th class="right">Total</th><th></th></tr></thead>
+    <tbody id="itemsBody">
+      ${d.items.map((it, i) => `<tr>
+        <td><input value="${it.namaBarang}" oninput="updItem(${i},'namaBarang',this.value)"></td>
+        <td><input value="${it.kategori}" oninput="updItem(${i},'kategori',this.value)"></td>
+        <td><input type="number" value="${it.harga}" oninput="updItem(${i},'harga',this.value)"></td>
+        <td><input type="number" value="${it.jumlah}" oninput="updItem(${i},'jumlah',this.value)"></td>
+        <td><input value="${it.satuan}" oninput="updItem(${i},'satuan',this.value)"></td>
+        <td class="right" id="itemTotal${i}">${rupiah(it.total)}</td>
+        <td><button class="link-btn" onclick="removeItem(${i})">✕</button></td>
+      </tr>`).join('')}
+    </tbody></table>
+    <button class="btn btn-outline btn-sm" style="margin-top:8px;" onclick="addItem()">+ Tambah Barang</button>
+    <div class="flexend" style="margin-top:10px;font-weight:800;color:var(--navy);">Total Harga: <span id="grandTotal">${rupiah(total)}</span></div>
+    <div class="note">Tanggal Transaksi harus sama dengan Tanggal Diterima.</div>
+    <div class="flexend" style="margin-top:12px;">
+      <button class="btn btn-outline" onclick="resetDraft()">Batal</button>
+      <button class="btn btn-outline" onclick="submitPembelian(false)">Simpan ke Draft</button>
+      <button class="btn btn-gold" onclick="submitPembelian(true)">Tandai Terkirim + Catat Transaksi</button>
+    </div>
+  `;
+    }
+    function syncDraftDates() {
+        const t = val('pb_tglTrx');
+        document.getElementById('pb_tglTerima').value = t;
+    }
+    function addItem() {
+        captureDraftHeader();
+        draftPembelian.items.push({ namaBarang: '', kategori: '', harga: 0, jumlah: 0, satuan: 'KG', total: 0 });
+        render();
+    }
+    function removeItem(i) {
+        captureDraftHeader();
+        draftPembelian.items.splice(i, 1);
+        render();
+    }
+    function updItem(i, field, value) {
+        const it = draftPembelian.items[i];
+        if (field === 'harga' || field === 'jumlah') it[field] = Number(value) || 0;
+        else it[field] = value;
+        it.total = it.harga * it.jumlah;
+        const cell = document.getElementById('itemTotal' + i);
+        if (cell) cell.textContent = rupiah(it.total);
+        const grand = draftPembelian.items.reduce((s, x) => s + x.total, 0);
+        const gt = document.getElementById('grandTotal');
+        if (gt) gt.textContent = rupiah(grand);
+    }
+    function captureDraftHeader() {
+        if (!draftPembelian) return;
+        draftPembelian.tanggalTransaksi = val('pb_tglTrx') || draftPembelian.tanggalTransaksi;
+        draftPembelian.tanggalDiterima = val('pb_tglTerima') || draftPembelian.tanggalDiterima;
+        draftPembelian.pemasokId = document.getElementById('pb_pemasok') ? document.getElementById('pb_pemasok').value : draftPembelian.pemasokId;
+        draftPembelian.akunKas = document.getElementById('pb_akunKas') ? document.getElementById('pb_akunKas').value : draftPembelian.akunKas;
+    }
+    function resetDraft() { draftPembelian = null; editingPembelianId = null; render(); }
+
+    function submitPembelian(kirim) {
+        captureDraftHeader();
+        const d = draftPembelian;
+        if (d.tanggalTransaksi !== d.tanggalDiterima) { toast('Tanggal Transaksi dan Tanggal Diterima harus sama'); return; }
+        if (!d.pemasokId) { toast('Pilih pemasok dulu'); return; }
+        if (d.items.length === 0) { toast('Tambahkan minimal 1 barang'); return; }
+        const total = d.items.reduce((s, i) => s + i.total, 0);
+        if (total <= 0) { toast('Total harga masih 0, cek harga/jumlah barang'); return; }
+
+        if (editingPembelianId) {
+            const idx = DB.pembelian.findIndex(p => p.id === editingPembelianId);
+            if (idx > -1) DB.pembelian[idx] = { ...d, id: editingPembelianId, status: kirim ? 'terkirim' : 'draft' };
+        } else {
+            DB.pembelian.push({ ...d, status: kirim ? 'terkirim' : 'draft' });
+        }
+
+        if (kirim) {
+            const pm = DB.pemasok.find(p => p.id === d.pemasokId);
+            const needApp = needsApprovalAmount(total);
+            const trxId = uid();
+            DB.transaksi.push({
+                id: trxId, tanggal: d.tanggalTransaksi, noBukti: 'SIPGN-' + d.id.slice(-6),
+                uraian: 'Pembelian Bahan Baku - ' + (pm ? pm.nama : '-'),
+                akunKas: d.akunKas, akunLawan: '2010', tipe: 'K', jumlah: total,
+                keterangan: d.items.map(i => i.namaBarang + ' ' + i.jumlah + i.satuan).join(', '),
+                sumber: 'sipgn', approvalStatus: needApp ? 'pending' : 'approved'
+            });
+            if (needApp) addApproval('pembelian', { linkedTransaksiId: trxId, deskripsi: 'Pembelian dari ' + (pm ? pm.nama : '-'), jumlah: total });
+            save('transaksi');
+        }
+        save('pembelian');
+        const ringkasan = buildRingkasan(d);
+        draftPembelian = null; editingPembelianId = null;
+        render();
+        toast(kirim ? 'Ditandai terkirim & tercatat sebagai transaksi' : 'Disimpan sebagai draft');
+        document.getElementById('pembelianDetail').innerHTML = ringkasan;
+    }
+    function buildRingkasan(d) {
+        const pm = DB.pemasok.find(p => p.id === d.pemasokId);
+        const total = d.items.reduce((s, i) => s + i.total, 0);
+        return `<div class="card">
+    <h2>Siap disalin ke SIPGN → Pembelian Langsung</h2>
+    <div class="copybox">Tanggal Transaksi : ${fmtDate(d.tanggalTransaksi)}
+Tanggal Diterima  : ${fmtDate(d.tanggalDiterima)}
+Nama Pemasok      : ${pm ? pm.nama : '-'}${pm && pm.kontak ? ' (' + pm.kontak + ')' : ''}
+${d.items.map(i => `- ${i.namaBarang} | Kategori: ${i.kategori || '-'} | Harga: ${rupiah(i.harga)} | Jumlah: ${i.jumlah} ${i.satuan} | Total: ${rupiah(i.total)}`).join('\n')}
+Total Harga       : ${rupiah(total)}</div>
+  </div>`;
+    }
+    function viewPembelian(id) {
+        const d = DB.pembelian.find(p => p.id === id);
+        if (!d) return;
+        document.getElementById('pembelianDetail').innerHTML = buildRingkasan(d);
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    }
+    function editPembelian(id) {
+        const d = DB.pembelian.find(p => p.id === id);
+        if (!d) return;
+        draftPembelian = JSON.parse(JSON.stringify(d));
+        editingPembelianId = id;
+        render();
+    }
+    function delPembelian(id) {
+        DB.pembelian = DB.pembelian.filter(p => p.id !== id);
+        save('pembelian'); render();
+    }
+
+    // ---------- KAS & PEMBAYARAN ----------
+    function renderKas() {
+        const saldoKas = saldoAkhirKasTotal();
+        const kRows = sortedTransaksi().filter(t => t.tipe === 'K');
+        const days = new Set(kRows.map(t => t.tanggal)).size || 1;
+        const totalKeluar = kRows.reduce((s, t) => s + t.jumlah, 0);
+        const avgBurn = totalKeluar / days;
+        const runway = avgBurn > 0 ? Math.floor(saldoKas / avgBurn) : null;
+        const batchList = DB.batch.slice().reverse();
+        return `
+  <div class="grid c3" style="margin-bottom:16px;">
+    <div class="kpi"><div class="num">${rupiah(saldoKas)}</div><div class="lbl">Saldo Kas Saat Ini</div></div>
+    <div class="kpi"><div class="num">${rupiah(Math.round(avgBurn))}</div><div class="lbl">Rata-rata Pengeluaran / Hari</div></div>
+    <div class="kpi"><div class="num">${runway === null ? '-' : runway + ' hari'}</div><div class="lbl">Estimasi Runway Kas</div></div>
+  </div>
+  <div class="card">
+    <h2>Ajukan Pembayaran (Batch)</h2>
+    <p class="sub">Butuh approval dulu. Transfer tetap dilakukan manual.</p>
+    <div class="grid c4">
+      <div class="field"><label>Jenis</label><select id="b_jenis"><option value="vendor">Pembayaran Vendor</option><option value="upah">Upah Sukarelawan</option></select></div>
+      <div class="field"><label>Penerima</label><input id="b_penerima" placeholder="Nama vendor / relawan"></div>
+      <div class="field"><label>Jumlah (Rp)</label><input id="b_jumlah" type="number" placeholder="0"></div>
+      <div class="field"><label>Jatuh Tempo</label><input id="b_jatuhTempo" type="date" value="${todayStr()}"></div>
+      <div class="field"><label>Akun Kas</label><select id="b_akunKas">${coaOptions(['Kas'])}</select></div>
+      <div class="field" style="grid-column:span 3;"><label>Akun Biaya</label><select id="b_akunLawan">${coaOptions(['Biaya Bahan Baku', 'Biaya Operasional', 'Biaya Fasilitas'])}</select></div>
+    </div>
+    <button class="btn btn-primary" onclick="ajukanBatch()">Ajukan untuk Approval</button>
+  </div>
+  <div class="card">
+    <h2>Daftar Batch Pembayaran</h2>
+    ${batchList.length === 0 ? '<div class="empty">Belum ada batch pembayaran.</div>' : `
+    <table><thead><tr><th>Jatuh Tempo</th><th>Jenis</th><th>Penerima</th><th class="right">Jumlah</th><th>Status</th></tr></thead>
+    <tbody>${batchList.map(b => `<tr><td>${fmtDate(b.jatuhTempo)}</td><td>${b.jenis === 'upah' ? 'Upah' : 'Vendor'}</td><td>${b.penerima}</td>
+      <td class="right">${rupiah(b.jumlah)}</td>
+      <td>${b.status === 'approved' ? '<span class="badge badge-ok">Disetujui & Tercatat</span>' : b.status === 'ditolak' ? '<span class="badge badge-bad">Ditolak</span>' : '<span class="badge badge-warn">Menunggu</span>'}</td>
+      </tr>`).join('')}</tbody></table>`}
+  </div>
+  `;
+    }
+    function ajukanBatch() {
+        const jenis = val('b_jenis'), penerima = val('b_penerima'), jumlah = Number(val('b_jumlah')) || 0;
+        const jatuhTempo = val('b_jatuhTempo'), akunKas = val('b_akunKas'), akunLawan = val('b_akunLawan');
+        if (!penerima || !jumlah) { toast('Penerima dan jumlah wajib diisi'); return; }
+        const id = uid();
+        DB.batch.push({ id, jenis, penerima, jumlah, jatuhTempo, akunKas, akunLawan, status: 'menunggu' });
+        save('batch');
+        addApproval('batch', { batchId: id, deskripsi: (jenis === 'upah' ? 'Upah - ' : 'Vendor - ') + penerima, jumlah });
+        render();
+        toast('Diajukan — menunggu approval di tab Approval & Digest');
+    }
+
+    // ---------- PAJAK & UPAH ----------
+    function renderPajak() {
+        const rows = DB.nominatif.slice().reverse();
+        const totalSemua = DB.nominatif.reduce((s, n) => s + n.grandTotal, 0);
+        const jenisOpt = JENIS_PEKERJAAN.map((j, i) => `<option value="${i}">${j.label} (${rupiah(j.tarif)}/hari)</option>`).join('');
+        return `
+  <div class="card">
+    <h2>Nominatif Upah Sukarelawan</h2>
+    <p class="sub">Tarif bisa diubah manual.</p>
+    <div class="grid c4">
+      <div class="field"><label>Nama Relawan</label><input id="n_nama" placeholder="Nama"></div>
+      <div class="field"><label>Jenis Pekerjaan</label><select id="n_jenis" onchange="fillTarif()">${jenisOpt}</select></div>
+      <div class="field"><label>Tarif / Hari (Rp)</label><input id="n_tarif" type="number" value="${JENIS_PEKERJAAN[0].tarif}"></div>
+      <div class="field"><label>Jumlah Hari Kerja</label><input id="n_hari" type="number" value="1"></div>
+    </div>
+    <div class="grid c3">
+      <div class="field"><label><input type="checkbox" id="n_bpjsKes" style="width:auto;display:inline-block;margin-right:6px;">BPJS Kesehatan (${rupiah(68000)})</label></div>
+      <div class="field"><label><input type="checkbox" id="n_bpjsTK" style="width:auto;display:inline-block;margin-right:6px;">BPJS Ketenagakerjaan (${rupiah(125000)})</label></div>
+      <div class="field"><label><input type="checkbox" id="n_honorPJ" style="width:auto;display:inline-block;margin-right:6px;">Honorarium PJ (${rupiah(50000)})</label></div>
+    </div>
+    <button class="btn btn-primary" onclick="addNominatif()">+ Tambah ke Daftar Nominatif</button>
+    <hr class="sep">
+    ${rows.length === 0 ? '<div class="empty">Belum ada data nominatif.</div>' : `
+    <div class="flexend"><button class="btn btn-outline btn-sm" onclick="exportNominatif()">Unduh CSV</button></div>
+    <table><thead><tr><th>Nama</th><th>Pekerjaan</th><th class="right">Hari</th><th class="right">Upah</th><th class="right">BPJS</th><th class="right">Honor PJ</th><th class="right">Total</th><th></th></tr></thead>
+    <tbody>${rows.map(n => `<tr><td>${n.nama}</td><td>${n.pekerjaan}</td><td class="right">${n.hari}</td>
+      <td class="right">${rupiah(n.upah)}</td><td class="right">${rupiah(n.bpjs)}</td><td class="right">${rupiah(n.honorPJ)}</td>
+      <td class="right"><b>${rupiah(n.grandTotal)}</b></td>
+      <td><button class="link-btn" onclick="delNominatif('${n.id}')">hapus</button></td></tr>`).join('')}
+    </tbody></table>
+    <div class="flexend" style="margin-top:10px;font-weight:800;color:var(--navy);">Total Semua: ${rupiah(totalSemua)}</div>`}
+  </div>
+
+  <div class="card">
+    <h2>Kalkulator PPN &amp; Estimasi PPh 21</h2>
+    <div class="grid c2">
+      <div>
+        <label>PPN 11% dari DPP</label>
+        <div class="field"><input id="ppn_dpp" type="number" placeholder="Masukkan DPP (Rp)" oninput="calcPPN()"></div>
+        <div class="small" id="ppnResult">PPN: Rp 0 · Total: Rp 0</div>
+      </div>
+      <div>
+        <label>Estimasi PPh 21 tahunan (ilustrasi kasar, tarif progresif Ps. 17)</label>
+        <div class="field"><input id="pph_penghasilan" type="number" placeholder="Penghasilan neto setahun (Rp)" oninput="calcPPh21()"></div>
+        <div class="small" id="pphResult">Estimasi PPh 21: Rp 0</div>
+      </div>
+    </div>
+    <div class="note">Perkiraan kasar, bukan nasihat pajak resmi.</div>
+  </div>
+  `;
+    }
+    function fillTarif() {
+        const idx = Number(val('n_jenis')) || 0;
+        document.getElementById('n_tarif').value = JENIS_PEKERJAAN[idx].tarif;
+    }
+    function addNominatif() {
+        const nama = val('n_nama'); if (!nama) { toast('Nama relawan wajib diisi'); return; }
+        const idx = Number(val('n_jenis')) || 0;
+        const tarif = Number(val('n_tarif')) || 0;
+        const hari = Number(val('n_hari')) || 0;
+        const upah = tarif * hari;
+        let bpjs = 0;
+        if (document.getElementById('n_bpjsKes').checked) bpjs += 68000;
+        if (document.getElementById('n_bpjsTK').checked) bpjs += 125000;
+        const honorPJ = document.getElementById('n_honorPJ').checked ? 50000 : 0;
+        const grandTotal = upah + bpjs + honorPJ;
+        DB.nominatif.push({ id: uid(), nama, pekerjaan: JENIS_PEKERJAAN[idx].label, hari, tarif, upah, bpjs, honorPJ, grandTotal });
+        save('nominatif'); render();
+        toast('Ditambahkan ke daftar nominatif');
+    }
+    function delNominatif(id) {
+        DB.nominatif = DB.nominatif.filter(n => n.id !== id);
+        save('nominatif'); render();
+    }
+    function exportNominatif() {
+        const rows = DB.nominatif.map(n => [n.nama, n.pekerjaan, n.hari, n.tarif, n.upah, n.bpjs, n.honorPJ, n.grandTotal]);
+        downloadCSV('Daftar_Nominatif_Upah.csv', ['Nama', 'Pekerjaan', 'Hari', 'Tarif', 'Upah', 'BPJS', 'Honor PJ', 'Total'], rows);
+    }
+    function calcPPN() {
+        const dpp = Number(val('ppn_dpp')) || 0;
+        const ppn = Math.round(dpp * 0.11);
+        document.getElementById('ppnResult').textContent = `PPN: ${rupiah(ppn)} · Total: ${rupiah(dpp + ppn)}`;
+    }
+    function calcPPh21() {
+        let sisa = Number(val('pph_penghasilan')) || 0;
+        const brackets = [[60000000, 0.05], [190000000, 0.15], [250000000, 0.25], [4150000000, 0.30], [Infinity, 0.35]];
+        let pajak = 0;
+        for (const [batas, tarif] of brackets) {
+            if (sisa <= 0) break;
+            const kena = Math.min(sisa, batas);
+            pajak += kena * tarif;
+            sisa -= kena;
+        }
+        document.getElementById('pphResult').textContent = `Estimasi PPh 21: ${rupiah(Math.round(pajak))} / tahun`;
+    }
+
+    // ---------- BUKU OTOMATIS ----------
+    function renderBuku() {
+        const subs = [
+            { id: 'bku', label: 'BKU' },
+            { id: 'bpkas', label: 'BP Kas' },
+            { id: 'bpbahan', label: 'BP Bahan Baku' },
+            { id: 'bpops', label: 'BP Operasional' },
+            { id: 'bpfas', label: 'BP Fasilitas' },
+            { id: 'bppajak', label: 'BP Pajak' },
+            { id: 'catatan', label: 'Catatan Pengeluaran' },
+        ];
+        let body = '';
+        if (bukuSubtab === 'bku') body = bukuBKU();
+        else if (bukuSubtab === 'bpkas') body = bukuBPKas();
+        else if (bukuSubtab === 'bpbahan') body = bukuBP('2000', '2010', 'Bahan Baku');
+        else if (bukuSubtab === 'bpops') body = bukuBP('2100', '2110', 'Operasional');
+        else if (bukuSubtab === 'bpfas') body = bukuBP('2150', '2160', 'Insentif Fasilitas');
+        else if (bukuSubtab === 'bppajak') body = bukuBPPajak();
+        else if (bukuSubtab === 'catatan') body = bukuCatatan();
+        return `
+    <div class="note blue">Hanya transaksi yang sudah disetujui yang dihitung.</div>
+    <div class="subtabs">${subs.map(s => `<button class="subtab ${s.id === bukuSubtab ? 'active' : ''}" onclick="setBukuSub('${s.id}')">${s.label}</button>`).join('')}</div>
+    ${body}
+  `;
+    }
+    function setBukuSub(id) { bukuSubtab = id; render(); }
+
+    function bukuBKU() {
+        const rows = ledgerAllKas();
+        return `<div class="card">
+    <h2>Buku Kas Umum (BKU)</h2>
+    
+    <div class="flexend"><button class="btn btn-outline btn-sm" onclick='exportBKU()'>Unduh CSV</button></div>
+    ${rows.length === 0 ? '<div class="empty">Belum ada data.</div>' : `
+    <table><thead><tr><th>Tanggal</th><th>No Bukti</th><th>Uraian</th><th class="right">Debit</th><th class="right">Kredit</th><th class="right">Saldo</th></tr></thead>
+    <tbody>${rows.map(r => `<tr><td>${fmtDate(r.tanggal)}</td><td>${r.noBukti || '-'}</td><td>${r.uraian}</td>
+      <td class="right">${r.d ? rupiah(r.d) : '-'}</td><td class="right">${r.k ? rupiah(r.k) : '-'}</td><td class="right"><b>${rupiah(r.saldo)}</b></td></tr>`).join('')}
+    </tbody></table>`}
+  </div>`;
+    }
+    function exportBKU() {
+        const rows = ledgerAllKas().map(r => [fmtDate(r.tanggal), r.noBukti || '', r.uraian, r.d || 0, r.k || 0, r.saldo]);
+        downloadCSV('BKU.csv', ['Tanggal', 'No Bukti', 'Uraian', 'Debit', 'Kredit', 'Saldo'], rows);
+    }
+    function bukuBPKas() {
+        const kasAccounts = DB.coa.filter(c => c.kategori === 'Kas');
+        return kasAccounts.map(ka => {
+            const rows = ledgerForKas(ka.kode);
+            return `<div class="card">
+      <h2>BP Kas — ${ka.nama}</h2>
+      ${rows.length === 0 ? '<div class="empty">Belum ada data.</div>' : `
+      <table><thead><tr><th>Tanggal</th><th>No Bukti</th><th>Uraian</th><th class="right">Debit</th><th class="right">Kredit</th><th class="right">Saldo</th></tr></thead>
+      <tbody>${rows.map(r => `<tr><td>${fmtDate(r.tanggal)}</td><td>${r.noBukti || '-'}</td><td>${r.uraian}</td>
+        <td class="right">${r.d ? rupiah(r.d) : '-'}</td><td class="right">${r.k ? rupiah(r.k) : '-'}</td><td class="right"><b>${rupiah(r.saldo)}</b></td></tr>`).join('')}
+      </tbody></table>`}
+    </div>`;
+        }).join('');
+    }
+    function bukuBP(kodeMasuk, kodeBiaya, label) {
+        const rows = ledgerBP(kodeMasuk, kodeBiaya);
+        return `<div class="card">
+    <h2>Buku Pembantu — ${label}</h2>
+    
+    ${rows.length === 0 ? '<div class="empty">Belum ada data.</div>' : `
+    <table><thead><tr><th>Tanggal</th><th>Uraian</th><th class="right">Dana Masuk</th><th class="right">Biaya</th><th class="right">Saldo</th></tr></thead>
+    <tbody>${rows.map(r => `<tr><td>${fmtDate(r.tanggal)}</td><td>${r.uraian}</td>
+      <td class="right">${r.masuk ? rupiah(r.masuk) : '-'}</td><td class="right">${r.keluar ? rupiah(r.keluar) : '-'}</td><td class="right"><b>${rupiah(r.saldo)}</b></td></tr>`).join('')}
+    </tbody></table>`}
+  </div>`;
+    }
+    function bukuBPPajak() {
+        const kodePajak = DB.coa.filter(c => c.kategori === 'Pajak').map(c => c.kode);
+        const rows = sortedTransaksi().filter(t => kodePajak.includes(t.akunLawan));
+        const totalPerJenis = {};
+        rows.forEach(r => { totalPerJenis[r.akunLawan] = (totalPerJenis[r.akunLawan] || 0) + r.jumlah; });
+        return `<div class="card">
+    <h2>Buku Pembantu — Pajak</h2>
+    ${rows.length === 0 ? '<div class="empty">Belum ada data pajak.</div>' : `
+    <table><thead><tr><th>Tanggal</th><th>Jenis Pajak</th><th>Uraian</th><th class="right">Jumlah</th></tr></thead>
+    <tbody>${rows.map(r => `<tr><td>${fmtDate(r.tanggal)}</td><td>${coaByKode(r.akunLawan)?.nama}</td><td>${r.uraian}</td><td class="right">${rupiah(r.jumlah)}</td></tr>`).join('')}
+    </tbody></table>
+    <hr class="sep">
+    <b>Total per jenis:</b>
+    <ul class="small">${Object.keys(totalPerJenis).map(k => `<li>${coaByKode(k)?.nama}: ${rupiah(totalPerJenis[k])}</li>`).join('')}</ul>
+    `}
+  </div>`;
+    }
+    function bukuCatatan() {
+        const rows = sortedTransaksi().filter(t => t.tipe === 'K').slice().reverse();
+        return `<div class="card">
+    <h2>Catatan Pengeluaran</h2>
+    <div class="flexend"><button class="btn btn-outline btn-sm" onclick="exportCatatan()">Unduh CSV</button></div>
+    ${rows.length === 0 ? '<div class="empty">Belum ada pengeluaran.</div>' : `
+    <table><thead><tr><th>Tanggal</th><th>Uraian</th><th>Kategori</th><th class="right">Jumlah</th></tr></thead>
+    <tbody>${rows.map(r => `<tr><td>${fmtDate(r.tanggal)}</td><td>${r.uraian}</td><td>${coaByKode(r.akunLawan)?.kategori || '-'}</td><td class="right">${rupiah(r.jumlah)}</td></tr>`).join('')}
+    </tbody></table>`}
+  </div>`;
+    }
+    function exportCatatan() {
+        const rows = sortedTransaksi().filter(t => t.tipe === 'K').map(r => [fmtDate(r.tanggal), r.uraian, coaByKode(r.akunLawan)?.kategori || '', r.jumlah]);
+        downloadCSV('Catatan_Pengeluaran.csv', ['Tanggal', 'Uraian', 'Kategori', 'Jumlah'], rows);
+    }
+
+    // ---------- LAPORAN ----------
+    function renderLaporan() {
+        const a = DB.anggaran;
+        const biayaBahan = sumBiaya('2010');
+        const biayaOps = sumBiaya('2110');
+        const biayaFas = sumBiaya('2160');
+        const totalAnggaran = (a.bahanMakanan || 0) + (a.operasional || 0) + (a.insentifFasilitas || 0);
+        const totalRealisasi = biayaBahan + biayaOps + biayaFas;
+
+        const saldoKas = saldoAkhirKasTotal();
+        const saldoGabungan = saldoBP('2000', '2010') + saldoBP('2100', '2110') + saldoBP('2150', '2160');
+        const cocok = Math.abs(saldoKas - saldoGabungan) < 1;
+
+        const anomali = detectAnomali();
+        const s = DB.setup;
+
+        return `
+  <div class="card">
+    <h2>Laporan Penggunaan Anggaran (LPA) — ${a.periode || '(periode belum diisi)'}</h2>
+    <table><thead><tr><th>Kategori</th><th class="right">Anggaran</th><th class="right">Realisasi</th><th class="right">Sisa</th></tr></thead>
+    <tbody>
+      <tr><td>Bahan Makanan</td><td class="right">${rupiah(a.bahanMakanan)}</td><td class="right">${rupiah(biayaBahan)}</td><td class="right">${rupiah(a.bahanMakanan - biayaBahan)}</td></tr>
+      <tr><td>Operasional</td><td class="right">${rupiah(a.operasional)}</td><td class="right">${rupiah(biayaOps)}</td><td class="right">${rupiah(a.operasional - biayaOps)}</td></tr>
+      <tr><td>Insentif Fasilitas</td><td class="right">${rupiah(a.insentifFasilitas)}</td><td class="right">${rupiah(biayaFas)}</td><td class="right">${rupiah(a.insentifFasilitas - biayaFas)}</td></tr>
+      <tr style="font-weight:800;"><td>Total</td><td class="right">${rupiah(totalAnggaran)}</td><td class="right">${rupiah(totalRealisasi)}</td><td class="right">${rupiah(totalAnggaran - totalRealisasi)}</td></tr>
+    </tbody></table>
+  </div>
+  <div class="card">
+    <h2>Validasi Saldo</h2>
+    
+    <table>
+      <tr><td>Saldo BKU (Kas)</td><td class="right">${rupiah(saldoKas)}</td></tr>
+      <tr><td>Saldo BP Bahan Baku + Operasional + Fasilitas</td><td class="right">${rupiah(saldoGabungan)}</td></tr>
+    </table>
+    <div style="margin-top:10px;">${cocok ? '<span class="badge badge-ok">Oke, Cocok</span>' : '<span class="badge badge-bad">Tidak Cocok — cek input transaksi</span>'}</div>
+  </div>
+  <div class="card">
+    <h2>Deteksi Anomali Pengeluaran</h2>
+    <p class="sub">Jumlah jauh di atas rata-rata kategori.</p>
+    ${anomali.length === 0 ? '<div class="empty">Tidak ada anomali terdeteksi.</div>' : `
+    <table><thead><tr><th>Tanggal</th><th>Uraian</th><th>Kategori</th><th class="right">Jumlah</th><th class="right">Rata-rata Kategori</th></tr></thead>
+    <tbody>${anomali.map(r => `<tr><td>${fmtDate(r.tanggal)}</td><td>${r.uraian}</td><td>${r.kategori}</td>
+      <td class="right"><span class="badge badge-warn">${rupiah(r.jumlah)}</span></td><td class="right">${rupiah(Math.round(r.rata))}</td></tr>`).join('')}
+    </tbody></table>`}
+  </div>
+  <div class="card">
+    <h2>Review Sebelum Dikirim Keluar</h2>
+    <p class="sub">Tandai sebelum dipakai ke pihak eksternal.</p>
+    <div style="margin-bottom:10px;">${s.reviewed ? `<span class="badge badge-ok">Sudah direview oleh ${s.reviewedBy || '-'} pada ${fmtDate(s.reviewedAt)}</span>` : '<span class="badge badge-warn">Belum direview — jangan dikirim ke pihak eksternal dulu</span>'}</div>
+    <div class="grid c2">
+      <div class="field"><label>Direview oleh</label><input id="rv_nama" placeholder="Nama pereview"></div>
+    </div>
+    <button class="btn btn-gold" onclick="markReviewed()">Tandai Sudah Direview</button>
+  </div>
+  <div class="card">
+    <h2>Dokumen Pendukung</h2>
+    <p class="sub">Draf teks, salin ke template resmi.</p>
+    <div class="copybox">SURAT PERNYATAAN TANGGUNG JAWAB (draf)
+Periode           : ${a.periode || '-'}
+Nama SPPG         : ${DB.setup.namaSPPG || '-'}
+Kepala SPPG       : ${DB.setup.kepalaSPPG || '-'}
+Total Anggaran    : ${rupiah(totalAnggaran)}
+Total Realisasi   : ${rupiah(totalRealisasi)}
+Sisa Dana         : ${rupiah(totalAnggaran - totalRealisasi)}
+Status Validasi   : ${cocok ? 'Cocok' : 'Tidak cocok, perlu ditinjau'}
+Status Review     : ${s.reviewed ? 'Sudah direview' : 'Belum direview'}</div>
+  </div>
+  `;
+    }
+    function markReviewed() {
+        DB.setup.reviewed = true;
+        DB.setup.reviewedBy = val('rv_nama') || DB.setup.reviewedBy;
+        DB.setup.reviewedAt = todayStr();
+        save('setup'); render();
+        toast('Ditandai sudah direview');
+    }
+    function detectAnomali() {
+        const rows = sortedTransaksi().filter(t => t.tipe === 'K');
+        const byKategori = {};
+        rows.forEach(t => {
+            const kat = coaByKode(t.akunLawan)?.kategori || 'Lainnya';
+            byKategori[kat] = byKategori[kat] || [];
+            byKategori[kat].push(t);
+        });
+        const anomali = [];
+        Object.keys(byKategori).forEach(kat => {
+            const list = byKategori[kat];
+            if (list.length < 3) return;
+            const rata = list.reduce((s, t) => s + t.jumlah, 0) / list.length;
+            list.forEach(t => { if (t.jumlah > rata * 2) anomali.push({ ...t, kategori: kat, rata }); });
+        });
+        return anomali.sort((a, b) => b.jumlah - a.jumlah);
+    }
+
+    // ---------- init ----------
+    (async function init() {
+        await loadAll();
+        render();
+    })();
+</script>
+</body>
+</html>
