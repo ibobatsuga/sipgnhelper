@@ -1001,6 +1001,7 @@
     let nominatifFilterDept = 'Semua';
     let nominatifSelected = new Set();
     let nominatifExportBusy = false;
+    let ledgerExportBusy = false;
 
     // ---------- storage helpers (per-user rows in Supabase, isolated by RLS) ----------
     async function loadAll() {
@@ -2257,53 +2258,36 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
     // ---------- PAJAK & UPAH ----------
     function renderPajak() {
         const totalSemua = DB.nominatif.reduce((s, n) => s + n.grandTotal, 0);
-        const rows = DB.nominatif.slice().reverse()
-            .filter(n => nominatifFilterDept === 'Semua' || n.departemen === nominatifFilterDept);
+        const rows = DB.nominatif.slice().reverse();
         const jenisOpt = JENIS_PEKERJAAN.map((j, i) => `<option value="${i}">${j.label} (${rupiah(j.tarif)}/hari)</option>`).join('');
         const deptOpt = DEPARTEMEN_LIST.map(d => `<option value="${d}">${d}</option>`).join('');
-        const deptFilterOpt = ['Semua'].concat(DEPARTEMEN_LIST).map(d => `<option value="${d}" ${d === nominatifFilterDept ? 'selected' : ''}>${d}</option>`).join('');
-        const allFilteredSelected = rows.length > 0 && rows.every(n => nominatifSelected.has(n.id));
         return `
   <div class="card">
     <h2>Nominatif Upah Sukarelawan</h2>
-    <p class="sub">Tarif bisa diubah manual.</p>
-    <div class="grid c4">
+    <p class="sub">Tarif bisa diubah manual. Untuk memilih personel &amp; mengekspor slip per orang, buka menu <b>Buku Otomatis</b>.</p>
+    <div class="grid" style="grid-template-columns: 1.3fr 1.3fr 1fr 0.9fr 0.7fr; align-items:end;">
       <div class="field"><label>Nama Relawan</label><input id="n_nama" placeholder="Nama"></div>
       <div class="field"><label>Jenis Pekerjaan</label><select id="n_jenis" onchange="fillTarif()">${jenisOpt}</select></div>
+      <div class="field"><label>Departemen</label><select id="n_departemen">${deptOpt}</select></div>
       <div class="field"><label>Tarif / Hari (Rp)</label><input id="n_tarif" type="number" value="${JENIS_PEKERJAAN[0].tarif}"></div>
-      <div class="field"><label>Jumlah Hari Kerja</label><input id="n_hari" type="number" value="1"></div>
+      <div class="field"><label>Hari Kerja</label><input id="n_hari" type="number" value="1"></div>
     </div>
     <div class="grid c3">
-      <div class="field"><label>Departemen</label><select id="n_departemen">${deptOpt}</select></div>
       <div class="field"><label><input type="checkbox" id="n_bpjsKes" style="width:auto;display:inline-block;margin-right:6px;">BPJS Kesehatan (${rupiah(68000)})</label></div>
       <div class="field"><label><input type="checkbox" id="n_bpjsTK" style="width:auto;display:inline-block;margin-right:6px;">BPJS Ketenagakerjaan (${rupiah(125000)})</label></div>
-    </div>
-    <div class="grid c3">
       <div class="field"><label><input type="checkbox" id="n_honorPJ" style="width:auto;display:inline-block;margin-right:6px;">Honorarium PJ (${rupiah(50000)})</label></div>
     </div>
     <button class="btn btn-primary" onclick="addNominatif()">Tambah ke Daftar Nominatif</button>
     <hr class="sep">
-    ${DB.nominatif.length === 0 ? '<div class="empty">Belum ada data nominatif.</div>' : `
-    <div class="flexend" style="justify-content:space-between;align-items:center;">
-      <div class="field" style="margin-bottom:0;min-width:200px;"><label>Filter Departemen</label><select id="n_filterDept" onchange="filterNominatifDept(this.value)">${deptFilterOpt}</select></div>
-      <div style="display:flex;gap:8px;">
-        <button class="btn btn-outline btn-sm" onclick="exportNominatif()">Unduh CSV</button>
-        <button class="btn btn-gold btn-sm" ${nominatifSelected.size === 0 || nominatifExportBusy ? 'disabled' : ''} onclick="downloadBukuOtomatis()">
-          ${nominatifExportBusy ? 'Membuat Workbook…' : `Unduh Buku Otomatis (${nominatifSelected.size} terpilih)`}
-        </button>
-      </div>
-    </div>
-    ${rows.length === 0 ? '<div class="empty">Tidak ada data untuk departemen ini.</div>' : `
-    <table><thead><tr>
-      <th class="center"><input type="checkbox" ${allFilteredSelected ? 'checked' : ''} onchange="toggleNominatifSelectAll(this.checked)"></th>
-      <th>Nama</th><th>Departemen</th><th>Pekerjaan</th><th class="right">Hari</th><th class="right">Upah</th><th class="right">BPJS</th><th class="right">Honor PJ</th><th class="right">Total</th><th></th></tr></thead>
+    ${rows.length === 0 ? '<div class="empty">Belum ada data nominatif.</div>' : `
+    <div class="flexend"><button class="btn btn-outline btn-sm" onclick="exportNominatif()">Unduh CSV</button></div>
+    <table><thead><tr><th>Nama</th><th>Departemen</th><th>Pekerjaan</th><th class="right">Hari</th><th class="right">Upah</th><th class="right">BPJS</th><th class="right">Honor PJ</th><th class="right">Total</th><th></th></tr></thead>
     <tbody>${rows.map(n => `<tr>
-      <td class="center"><input type="checkbox" ${nominatifSelected.has(n.id) ? 'checked' : ''} onchange="toggleNominatifSelect('${n.id}')"></td>
       <td>${n.nama}</td><td>${n.departemen || '-'}</td><td>${n.pekerjaan}</td><td class="right">${n.hari}</td>
       <td class="right">${rupiah(n.upah)}</td><td class="right">${rupiah(n.bpjs)}</td><td class="right">${rupiah(n.honorPJ)}</td>
       <td class="right"><b>${rupiah(n.grandTotal)}</b></td>
       <td><button class="link-btn" onclick="delNominatif('${n.id}')">hapus</button></td></tr>`).join('')}
-    </tbody></table>`}
+    </tbody></table>
     <div class="flexend" style="margin-top:10px;font-weight:800;color:var(--navy);">Total Semua: ${rupiah(totalSemua)}</div>`}
   </div>
 
@@ -2438,29 +2422,132 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
         else if (bukuSubtab === 'bppajak') body = bukuBPPajak();
         else if (bukuSubtab === 'catatan') body = bukuCatatan();
         return `
+    ${renderNominatifSelector()}
+
+    <div class="card">
+    <h2>Buku Kas &amp; Pembantu</h2>
     <div class="note blue">Hanya transaksi yang sudah disetujui yang dihitung.</div>
+    <div class="flexend" style="margin-bottom:14px;">
+      <button class="btn btn-gold" ${ledgerExportBusy ? 'disabled' : ''} onclick="downloadLedgerWorkbook()">
+        ${ledgerExportBusy ? 'Membuat Workbook…' : 'Unduh Master (dalam format xlsx)'}
+      </button>
+    </div>
     <div class="subtabs">${subs.map(s => `<button class="subtab ${s.id === bukuSubtab ? 'active' : ''}" onclick="setBukuSub('${s.id}')">${s.label}</button>`).join('')}</div>
     ${body}
+    </div>
   `;
     }
     function setBukuSub(id) { bukuSubtab = id; render(); }
+    function renderNominatifSelector() {
+        const rows = DB.nominatif.slice().reverse()
+            .filter(n => nominatifFilterDept === 'Semua' || n.departemen === nominatifFilterDept);
+        const deptFilterOpt = ['Semua'].concat(DEPARTEMEN_LIST).map(d => `<option value="${d}" ${d === nominatifFilterDept ? 'selected' : ''}>${d}</option>`).join('');
+        const allFilteredSelected = rows.length > 0 && rows.every(n => nominatifSelected.has(n.id));
+        return `
+    <div class="card">
+      <h2>Ekspor Slip Nominatif per Personel</h2>
+      <p class="sub">Centang personel yang mau dimasukkan, lalu unduh — tiap personel jadi 1 sheet dalam satu workbook Excel.</p>
+      ${DB.nominatif.length === 0 ? '<div class="empty">Belum ada data nominatif. Tambahkan dulu di menu Pajak &amp; Upah.</div>' : `
+      <div class="flexend" style="justify-content:space-between;align-items:center;">
+        <div class="field" style="margin-bottom:0;min-width:200px;"><label>Filter Departemen</label><select id="n_filterDept" onchange="filterNominatifDept(this.value)">${deptFilterOpt}</select></div>
+        <button class="btn btn-gold btn-sm" ${nominatifSelected.size === 0 || nominatifExportBusy ? 'disabled' : ''} onclick="downloadBukuOtomatis()">
+          ${nominatifExportBusy ? 'Membuat Workbook…' : `Unduh Buku Otomatis (${nominatifSelected.size} terpilih)`}
+        </button>
+      </div>
+      ${rows.length === 0 ? '<div class="empty">Tidak ada data untuk departemen ini.</div>' : `
+      <table><thead><tr>
+        <th class="center"><input type="checkbox" ${allFilteredSelected ? 'checked' : ''} onchange="toggleNominatifSelectAll(this.checked)"></th>
+        <th>Nama</th><th>Departemen</th><th>Pekerjaan</th><th class="right">Hari</th><th class="right">Total</th></tr></thead>
+      <tbody>${rows.map(n => `<tr>
+        <td class="center"><input type="checkbox" ${nominatifSelected.has(n.id) ? 'checked' : ''} onchange="toggleNominatifSelect('${n.id}')"></td>
+        <td>${n.nama}</td><td>${n.departemen || '-'}</td><td>${n.pekerjaan}</td><td class="right">${n.hari}</td>
+        <td class="right"><b>${rupiah(n.grandTotal)}</b></td></tr>`).join('')}
+      </tbody></table>`}`}
+    </div>`;
+    }
+    function buildLedgerSheets() {
+        const bkuHeaders = ['Tanggal', 'No Bukti', 'Uraian', 'Debit', 'Kredit', 'Saldo'];
+        const sheets = [{
+            name: 'BKU',
+            headers: bkuHeaders,
+            rows: ledgerAllKas().map(r => [fmtDate(r.tanggal), r.noBukti || '-', r.uraian, r.d || 0, r.k || 0, r.saldo]),
+        }];
+
+        DB.coa.filter(c => c.kategori === 'Kas').forEach(ka => {
+            sheets.push({
+                name: `BP Kas - ${ka.nama}`,
+                headers: bkuHeaders,
+                rows: ledgerForKas(ka.kode).map(r => [fmtDate(r.tanggal), r.noBukti || '-', r.uraian, r.d || 0, r.k || 0, r.saldo]),
+            });
+        });
+
+        const bpHeaders = ['Tanggal', 'Uraian', 'Dana Masuk', 'Biaya', 'Saldo'];
+        [
+            { kodeMasuk: '2000', kodeBiaya: '2010', label: 'BP Bahan Baku' },
+            { kodeMasuk: '2100', kodeBiaya: '2110', label: 'BP Operasional' },
+            { kodeMasuk: '2150', kodeBiaya: '2160', label: 'BP Fasilitas' },
+        ].forEach(({ kodeMasuk, kodeBiaya, label }) => {
+            sheets.push({
+                name: label,
+                headers: bpHeaders,
+                rows: ledgerBP(kodeMasuk, kodeBiaya).map(r => [fmtDate(r.tanggal), r.uraian, r.masuk || 0, r.keluar || 0, r.saldo]),
+            });
+        });
+
+        const kodePajak = DB.coa.filter(c => c.kategori === 'Pajak').map(c => c.kode);
+        sheets.push({
+            name: 'BP Pajak',
+            headers: ['Tanggal', 'Jenis Pajak', 'Uraian', 'Jumlah'],
+            rows: sortedTransaksi().filter(t => kodePajak.includes(t.akunLawan))
+                .map(r => [fmtDate(r.tanggal), coaByKode(r.akunLawan)?.nama || '-', r.uraian, r.jumlah]),
+        });
+
+        sheets.push({
+            name: 'Catatan Pengeluaran',
+            headers: ['Tanggal', 'Uraian', 'Kategori', 'Jumlah'],
+            rows: sortedTransaksi().filter(t => t.tipe === 'K')
+                .map(r => [fmtDate(r.tanggal), r.uraian, coaByKode(r.akunLawan)?.kategori || '-', r.jumlah]),
+        });
+
+        return sheets;
+    }
+    async function downloadLedgerWorkbook() {
+        if (ledgerExportBusy) return;
+        ledgerExportBusy = true; render();
+        try {
+            const res = await fetch('/api/report/generate-ledger-workbook', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sheets: buildLedgerSheets() }),
+                signal: AbortSignal.timeout(30000)
+            });
+            if (!res.ok) {
+                const body = await res.json().catch(() => null);
+                throw new Error(body?.message || 'Gagal membuat workbook');
+            }
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'Buku_Otomatis.xlsx'; a.click();
+            URL.revokeObjectURL(url);
+            toast('Workbook Buku Otomatis berhasil diunduh');
+        } catch (error) {
+            toast(error.message || 'Koneksi ke server gagal, workbook tidak dapat dibuat');
+        } finally {
+            ledgerExportBusy = false; render();
+        }
+    }
 
     function bukuBKU() {
         const rows = ledgerAllKas();
         return `<div class="card">
     <h2>Buku Kas Umum (BKU)</h2>
-    
-    <div class="flexend"><button class="btn btn-outline btn-sm" onclick='exportBKU()'>Unduh CSV</button></div>
     ${rows.length === 0 ? '<div class="empty">Belum ada data.</div>' : `
     <table><thead><tr><th>Tanggal</th><th>No Bukti</th><th>Uraian</th><th class="right">Debit</th><th class="right">Kredit</th><th class="right">Saldo</th></tr></thead>
     <tbody>${rows.map(r => `<tr><td>${fmtDate(r.tanggal)}</td><td>${r.noBukti || '-'}</td><td>${r.uraian}</td>
       <td class="right">${r.d ? rupiah(r.d) : '-'}</td><td class="right">${r.k ? rupiah(r.k) : '-'}</td><td class="right"><b>${rupiah(r.saldo)}</b></td></tr>`).join('')}
     </tbody></table>`}
   </div>`;
-    }
-    function exportBKU() {
-        const rows = ledgerAllKas().map(r => [fmtDate(r.tanggal), r.noBukti || '', r.uraian, r.d || 0, r.k || 0, r.saldo]);
-        downloadCSV('BKU.csv', ['Tanggal', 'No Bukti', 'Uraian', 'Debit', 'Kredit', 'Saldo'], rows);
     }
     function bukuBPKas() {
         const kasAccounts = DB.coa.filter(c => c.kategori === 'Kas');
@@ -2509,16 +2596,11 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
         const rows = sortedTransaksi().filter(t => t.tipe === 'K').slice().reverse();
         return `<div class="card">
     <h2>Catatan Pengeluaran</h2>
-    <div class="flexend"><button class="btn btn-outline btn-sm" onclick="exportCatatan()">Unduh CSV</button></div>
     ${rows.length === 0 ? '<div class="empty">Belum ada pengeluaran.</div>' : `
     <table><thead><tr><th>Tanggal</th><th>Uraian</th><th>Kategori</th><th class="right">Jumlah</th></tr></thead>
     <tbody>${rows.map(r => `<tr><td>${fmtDate(r.tanggal)}</td><td>${r.uraian}</td><td>${coaByKode(r.akunLawan)?.kategori || '-'}</td><td class="right">${rupiah(r.jumlah)}</td></tr>`).join('')}
     </tbody></table>`}
   </div>`;
-    }
-    function exportCatatan() {
-        const rows = sortedTransaksi().filter(t => t.tipe === 'K').map(r => [fmtDate(r.tanggal), r.uraian, coaByKode(r.akunLawan)?.kategori || '', r.jumlah]);
-        downloadCSV('Catatan_Pengeluaran.csv', ['Tanggal', 'Uraian', 'Kategori', 'Jumlah'], rows);
     }
 
     // ---------- LAPORAN ----------
