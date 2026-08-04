@@ -2778,25 +2778,39 @@ Status Review     : ${s.reviewed ? 'Sudah direview' : 'Belum direview'}</div>
     }
 
     // ---------- init ----------
+    let authBootstrapped = false;
+
+    async function applyAuthSession(session) {
+        if (session && session.user) {
+            const changedUser = !currentUser || currentUser.id !== session.user.id;
+            currentUser = session.user;
+            showApp();
+            if (changedUser || !authBootstrapped) {
+                await loadAll();
+                checkAndRunDailyRefresh(false);
+                authBootstrapped = true;
+            }
+            render();
+        } else {
+            currentUser = null;
+            authBootstrapped = false;
+            nominatifSelected = new Set();
+            try { sessionStorage.removeItem('sipgn_nominatif_selected'); } catch (e) { /* ignore */ }
+            showAuthScreen();
+        }
+    }
+
     // onAuthStateChange fires immediately with the current session on subscribe,
     // so it doubles as both the initial boot check and the login/logout handler.
     if (sb) {
-        sb.auth.onAuthStateChange(async (event, session) => {
-            if (session && session.user) {
-                const isNewUser = !currentUser || currentUser.id !== session.user.id;
-                currentUser = session.user;
-                if (isNewUser) {
-                    await loadAll();
-                    checkAndRunDailyRefresh(false);
-                }
-                showApp();
-                render();
-            } else {
-                currentUser = null;
-                nominatifSelected = new Set();
-                try { sessionStorage.removeItem('sipgn_nominatif_selected'); } catch (e) { /* ignore */ }
-                showAuthScreen();
-            }
+        sb.auth.onAuthStateChange((event, session) => {
+            // Deliberately not an async callback: supabase-js runs this while holding its
+            // auth lock and pushes our promise onto its pendingInLock queue. Any supabase
+            // call made from inside here (loadAll's select) re-enters _acquireLock, which
+            // awaits that queue's last entry — our own still-pending promise — and
+            // deadlocks, leaving the app rendered with an empty DB. Defer to a macrotask
+            // so the work runs after the lock is released.
+            setTimeout(() => { applyAuthSession(session); }, 0);
         });
     } else {
         showAuthError('Gagal memuat komponen login. Periksa koneksi internet, lalu muat ulang halaman.');
