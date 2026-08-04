@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SIPGN &amp; Laporan Keuangan SPPG — Sistem Terpadu</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
@@ -765,7 +766,61 @@
     .approval-row:last-child {
         border-bottom: none;
     }
+
+    .app-layout { display: none; }
+
+    .auth-screen {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, var(--navy), var(--navy-dark));
+        padding: 24px;
+    }
+    .auth-card {
+        background: #ffffff;
+        border-radius: 20px;
+        padding: 32px 28px;
+        width: 100%;
+        max-width: 380px;
+        box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+    }
+    .auth-sub {
+        font-size: 13px;
+        color: #64748b;
+        margin: 0 0 18px;
+        text-align: center;
+    }
+    .auth-foot {
+        font-size: 12.5px;
+        color: #64748b;
+        text-align: center;
+        margin-top: 14px;
+    }
+    .auth-foot a {
+        color: #0ea5e9;
+        font-weight: 600;
+        text-decoration: none;
+    }
     </style>
+
+    <div id="authScreen" class="auth-screen">
+      <div class="auth-card">
+        <div class="brand" style="justify-content:center;margin-bottom:8px;">
+          <span class="brand-name">SIPGN</span><span class="brand-dot">.HELPER</span>
+        </div>
+        <p class="auth-sub">Masuk untuk mengelola data SPPG Anda sendiri. Setiap akun punya data yang terpisah.</p>
+        <div class="subtabs" id="authTabs">
+          <button class="subtab active" onclick="setAuthMode('login')">Masuk</button>
+          <button class="subtab" onclick="setAuthMode('signup')">Daftar SPPG Baru</button>
+        </div>
+        <div class="field"><label>Email</label><input id="auth_email" type="email" placeholder="nama@email.com" autocomplete="username"></div>
+        <div class="field"><label>Kata Sandi</label><input id="auth_password" type="password" placeholder="Minimal 6 karakter" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitAuth()"></div>
+        <div id="authError" class="note" style="display:none;"></div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center;" id="authSubmitBtn" onclick="submitAuth()">Masuk</button>
+        <p class="auth-foot" id="authFootNote">Belum punya akun? <a href="#" onclick="setAuthMode('signup');return false;">Daftar di sini</a></p>
+      </div>
+    </div>
 
     <div class="app-layout">
         <!-- Sidebar Navigation Left -->
@@ -830,9 +885,10 @@
                     <div class="user-avatar">SP</div>
                     <div class="user-details">
                         <div class="user-name" id="sb-user-name">Pengelola SPPG</div>
-                        <div class="user-role">Keuangan &amp; SCM</div>
+                        <div class="user-role" id="sb-user-email">Keuangan &amp; SCM</div>
                     </div>
                 </div>
+                <button class="btn btn-outline btn-sm" style="width:100%;justify-content:center;margin-top:10px;" onclick="handleLogout()">Keluar</button>
             </div>
         </aside>
 
@@ -909,21 +965,33 @@
 
     const DEPARTEMEN_LIST = ['Dapur', 'Distribusi', 'Kebersihan', 'Keamanan', 'Administrasi'];
 
-    let DB = {
-        setup: {
-            namaSPPG: '', namaYayasan: '', kepalaSPPG: '', akuntan: '', alamat: '', rekening: '',
-            approvalThreshold: 500000, periodeMulai: '', periodeSelesai: '',
-            reviewed: false, reviewedBy: '', reviewedAt: ''
-        },
-        coa: DEFAULT_COA.slice(),
-        pemasok: [],
-        transaksi: [],
-        pembelian: [],
-        anggaran: { periode: '', bahanMakanan: 0, operasional: 0, insentifFasilitas: 0 },
-        approvals: [],
-        batch: [],
-        nominatif: [],
-    };
+    function defaultDB() {
+        return {
+            setup: {
+                namaSPPG: '', namaYayasan: '', kepalaSPPG: '', akuntan: '', alamat: '', rekening: '',
+                approvalThreshold: 500000, periodeMulai: '', periodeSelesai: '',
+                reviewed: false, reviewedBy: '', reviewedAt: ''
+            },
+            coa: DEFAULT_COA.slice(),
+            pemasok: [],
+            transaksi: [],
+            pembelian: [],
+            anggaran: { periode: '', bahanMakanan: 0, operasional: 0, insentifFasilitas: 0 },
+            approvals: [],
+            batch: [],
+            nominatif: [],
+        };
+    }
+    let DB = defaultDB();
+
+    const SUPABASE_URL = 'https://oxgngvnxwzdnrztyybkr.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_VluBgQaxc7C2xqCH9_36oA_5e3Fkx5L';
+    // window.supabase can be missing if the CDN script failed to load (offline, ad-blocker, CDN outage) —
+    // fail soft here so the rest of this script still initializes instead of crashing on a TDZ error.
+    const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+    let currentUser = null;
+    let authMode = 'login';
+    let authBusy = false;
 
     let activeTab = 'dashboard';
     let bukuSubtab = 'bku';
@@ -934,34 +1002,27 @@
     let nominatifSelected = new Set();
     let nominatifExportBusy = false;
 
-    // ---------- storage helpers ----------
+    // ---------- storage helpers (per-user rows in Supabase, isolated by RLS) ----------
     async function loadAll() {
         const keys = ['setup', 'coa', 'pemasok', 'transaksi', 'pembelian', 'anggaran', 'approvals', 'batch', 'nominatif'];
-        for (const k of keys) {
-            try {
-                let val = null;
-                if (typeof window.storage !== 'undefined' && window.storage && typeof window.storage.get === 'function') {
-                    const r = await window.storage.get(k, false);
-                    if (r && r.value) val = r.value;
-                } else if (typeof localStorage !== 'undefined') {
-                    val = localStorage.getItem('sipgn_' + k);
-                }
-                if (val) {
-                    DB[k] = JSON.parse(val);
-                }
-            } catch (e) { /* key not found yet, keep default */ }
-        }
+        DB = defaultDB();
+        if (!currentUser) return;
+        try {
+            const { data, error } = await sb.from('app_state').select('key,value').eq('user_id', currentUser.id);
+            if (error) throw error;
+            (data || []).forEach(row => { if (keys.includes(row.key)) DB[row.key] = row.value; });
+        } catch (e) { console.error('load failed', e); }
         if (!DB.coa || DB.coa.length === 0) DB.coa = DEFAULT_COA.slice();
         if (DB.setup.approvalThreshold === undefined) DB.setup.approvalThreshold = 500000;
         loadNominatifSelection();
     }
     async function save(key) {
+        if (!currentUser) return;
         try {
-            if (typeof window.storage !== 'undefined' && window.storage && typeof window.storage.set === 'function') {
-                await window.storage.set(key, JSON.stringify(DB[key]), false);
-            } else if (typeof localStorage !== 'undefined') {
-                localStorage.setItem('sipgn_' + key, JSON.stringify(DB[key]));
-            }
+            const { error } = await sb.from('app_state').upsert({
+                user_id: currentUser.id, key, value: DB[key], updated_at: new Date().toISOString()
+            });
+            if (error) throw error;
         } catch (e) { console.error('storage save failed', key, e); }
     }
     // Keeps the "Buku Otomatis" checkbox selection alive across an accidental page refresh.
@@ -1270,10 +1331,12 @@
         }
 
         // Update username in sidebar & header profile
-        const nameStr = DB.setup.namaSPPG || 'Pengelola SPPG';
+        const nameStr = DB.setup.namaSPPG || (currentUser && currentUser.email) || 'Pengelola SPPG';
         const sbName = document.getElementById('sb-user-name');
+        const sbEmail = document.getElementById('sb-user-email');
         const topName = document.getElementById('top-user-name');
         if (sbName) sbName.textContent = nameStr;
+        if (sbEmail) sbEmail.textContent = (currentUser && currentUser.email) || 'Keuangan & SCM';
         if (topName) topName.textContent = nameStr;
 
         // Update header dynamic title & subtitle based on active tab
@@ -2552,24 +2615,103 @@ Status Review     : ${s.reviewed ? 'Sudah direview' : 'Belum direview'}</div>
         return anomali.sort((a, b) => b.jumlah - a.jumlah);
     }
 
+    // ---------- auth ----------
+    function setAuthMode(mode) {
+        authMode = mode;
+        document.querySelectorAll('#authTabs .subtab').forEach((btn, i) => {
+            btn.classList.toggle('active', (mode === 'login' && i === 0) || (mode === 'signup' && i === 1));
+        });
+        document.getElementById('authSubmitBtn').textContent = mode === 'login' ? 'Masuk' : 'Daftar';
+        document.getElementById('authFootNote').innerHTML = mode === 'login'
+            ? 'Belum punya akun? <a href="#" onclick="setAuthMode(\'signup\');return false;">Daftar di sini</a>'
+            : 'Sudah punya akun? <a href="#" onclick="setAuthMode(\'login\');return false;">Masuk di sini</a>';
+        document.getElementById('authError').style.display = 'none';
+    }
+    function showAuthError(message, tone) {
+        const el = document.getElementById('authError');
+        el.textContent = message;
+        el.style.color = tone === 'info' ? '#0369a1' : '#dc2626';
+        el.style.background = tone === 'info' ? '#e0f2fe' : '#fee2e2';
+        el.style.borderColor = tone === 'info' ? '#bae6fd' : '#fecaca';
+        el.style.display = 'block';
+    }
+    async function submitAuth() {
+        if (authBusy) return;
+        if (!sb) { showAuthError('Gagal memuat komponen login. Periksa koneksi internet, lalu muat ulang halaman.'); return; }
+        const email = val('auth_email');
+        const password = document.getElementById('auth_password').value;
+        if (!email || !password) { showAuthError('Email dan kata sandi wajib diisi'); return; }
+        if (password.length < 6) { showAuthError('Kata sandi minimal 6 karakter'); return; }
+        authBusy = true;
+        const btn = document.getElementById('authSubmitBtn');
+        btn.disabled = true; btn.textContent = 'Memproses…';
+        try {
+            const { data, error } = authMode === 'login'
+                ? await sb.auth.signInWithPassword({ email, password })
+                : await sb.auth.signUp({ email, password });
+            if (error) throw error;
+            if (authMode === 'signup' && !data.session) {
+                showAuthError('Akun dibuat. Cek email untuk verifikasi, lalu masuk.', 'info');
+                setAuthMode('login');
+            }
+            // A successful login (or a signup that returns an active session)
+            // is picked up by onAuthStateChange below.
+        } catch (error) {
+            showAuthError(error.message || 'Gagal memproses permintaan');
+        } finally {
+            authBusy = false;
+            btn.disabled = false;
+            btn.textContent = authMode === 'login' ? 'Masuk' : 'Daftar';
+        }
+    }
+    async function handleLogout() {
+        if (sb) await sb.auth.signOut();
+    }
+    function showAuthScreen() {
+        document.getElementById('authScreen').style.display = 'flex';
+        document.querySelector('.app-layout').style.display = 'none';
+    }
+    function showApp() {
+        document.getElementById('authScreen').style.display = 'none';
+        document.querySelector('.app-layout').style.display = 'flex';
+    }
+
     // ---------- init ----------
-    (async function init() {
-        await loadAll();
-        checkAndRunDailyRefresh(false);
-        render();
-
-        // Check & refresh daily at background interval (every 5 minutes)
-        setInterval(() => {
-            checkAndRunDailyRefresh(false);
-        }, 300000);
-
-        // Check whenever user switches back to this tab
-        document.addEventListener('visibilitychange', () => {
-            if (!document.hidden) {
-                checkAndRunDailyRefresh(false);
+    // onAuthStateChange fires immediately with the current session on subscribe,
+    // so it doubles as both the initial boot check and the login/logout handler.
+    if (sb) {
+        sb.auth.onAuthStateChange(async (event, session) => {
+            if (session && session.user) {
+                const isNewUser = !currentUser || currentUser.id !== session.user.id;
+                currentUser = session.user;
+                if (isNewUser) {
+                    await loadAll();
+                    checkAndRunDailyRefresh(false);
+                }
+                showApp();
+                render();
+            } else {
+                currentUser = null;
+                nominatifSelected = new Set();
+                try { sessionStorage.removeItem('sipgn_nominatif_selected'); } catch (e) { /* ignore */ }
+                showAuthScreen();
             }
         });
-    })();
+    } else {
+        showAuthError('Gagal memuat komponen login. Periksa koneksi internet, lalu muat ulang halaman.');
+    }
+
+    // Check & refresh daily at background interval (every 5 minutes)
+    setInterval(() => {
+        if (currentUser) checkAndRunDailyRefresh(false);
+    }, 300000);
+
+    // Check whenever user switches back to this tab
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && currentUser) {
+            checkAndRunDailyRefresh(false);
+        }
+    });
 </script>
 </body>
 </html>
