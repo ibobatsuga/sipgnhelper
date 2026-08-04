@@ -502,6 +502,7 @@
 
     input, select, textarea {
         width: 100%;
+        height: 40px;
         padding: 9px 12px;
         border: 1px solid #cbd5e1;
         border-radius: 10px;
@@ -513,10 +514,23 @@
         transition: all 0.15s ease;
     }
 
+    select {
+        -webkit-appearance: none;
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%2364748b'%3E%3Cpath fill-rule='evenodd' d='M5.23 7.21a.75.75 0 011.06.02L10 11.19l3.71-3.96a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z' clip-rule='evenodd'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 10px center;
+        background-size: 16px;
+        padding-right: 32px;
+    }
+
     input:focus, select:focus, textarea:focus {
         border-color: #0ea5e9;
         box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
     }
+
+    .small { font-size: 12.5px; }
+    .muted { color: #64748b; }
 
     .field {
         margin-bottom: 12px;
@@ -2261,6 +2275,7 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
         const rows = DB.nominatif.slice().reverse();
         const jenisOpt = JENIS_PEKERJAAN.map((j, i) => `<option value="${i}">${j.label} (${rupiah(j.tarif)}/hari)</option>`).join('');
         const deptOpt = DEPARTEMEN_LIST.map(d => `<option value="${d}">${d}</option>`).join('');
+        const allSelected = rows.length > 0 && rows.every(n => nominatifSelected.has(n.id));
         return `
   <div class="card">
     <h2>Nominatif Upah Sukarelawan</h2>
@@ -2281,8 +2296,11 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
     <hr class="sep">
     ${rows.length === 0 ? '<div class="empty">Belum ada data nominatif.</div>' : `
     <div class="flexend"><button class="btn btn-outline btn-sm" onclick="exportNominatif()">Unduh CSV</button></div>
-    <table><thead><tr><th>Nama</th><th>Departemen</th><th>Pekerjaan</th><th class="right">Hari</th><th class="right">Upah</th><th class="right">BPJS</th><th class="right">Honor PJ</th><th class="right">Total</th><th></th></tr></thead>
+    <table><thead><tr>
+      <th class="center"><input type="checkbox" ${allSelected ? 'checked' : ''} onchange="toggleNominatifSelectAll(this.checked, 'Semua')" title="Pilih semua untuk pembukuan"></th>
+      <th>Nama</th><th>Departemen</th><th>Pekerjaan</th><th class="right">Hari</th><th class="right">Upah</th><th class="right">BPJS</th><th class="right">Honor PJ</th><th class="right">Total</th><th></th></tr></thead>
     <tbody>${rows.map(n => `<tr>
+      <td class="center"><input type="checkbox" ${nominatifSelected.has(n.id) ? 'checked' : ''} onchange="toggleNominatifSelect('${n.id}')" title="Sertakan di pembukuan"></td>
       <td>${n.nama}</td><td>${n.departemen || '-'}</td><td>${n.pekerjaan}</td><td class="right">${n.hari}</td>
       <td class="right">${rupiah(n.upah)}</td><td class="right">${rupiah(n.bpjs)}</td><td class="right">${rupiah(n.honorPJ)}</td>
       <td class="right"><b>${rupiah(n.grandTotal)}</b></td>
@@ -2348,8 +2366,9 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
         saveNominatifSelection();
         render();
     }
-    function toggleNominatifSelectAll(checked) {
-        const visible = DB.nominatif.filter(n => nominatifFilterDept === 'Semua' || n.departemen === nominatifFilterDept);
+    function toggleNominatifSelectAll(checked, dept) {
+        const activeDept = dept === undefined ? nominatifFilterDept : dept;
+        const visible = DB.nominatif.filter(n => activeDept === 'Semua' || n.departemen === activeDept);
         visible.forEach(n => {
             if (checked) nominatifSelected.add(n.id);
             else nominatifSelected.delete(n.id);
@@ -2759,25 +2778,39 @@ Status Review     : ${s.reviewed ? 'Sudah direview' : 'Belum direview'}</div>
     }
 
     // ---------- init ----------
+    let authBootstrapped = false;
+
+    async function applyAuthSession(session) {
+        if (session && session.user) {
+            const changedUser = !currentUser || currentUser.id !== session.user.id;
+            currentUser = session.user;
+            showApp();
+            if (changedUser || !authBootstrapped) {
+                await loadAll();
+                checkAndRunDailyRefresh(false);
+                authBootstrapped = true;
+            }
+            render();
+        } else {
+            currentUser = null;
+            authBootstrapped = false;
+            nominatifSelected = new Set();
+            try { sessionStorage.removeItem('sipgn_nominatif_selected'); } catch (e) { /* ignore */ }
+            showAuthScreen();
+        }
+    }
+
     // onAuthStateChange fires immediately with the current session on subscribe,
     // so it doubles as both the initial boot check and the login/logout handler.
     if (sb) {
-        sb.auth.onAuthStateChange(async (event, session) => {
-            if (session && session.user) {
-                const isNewUser = !currentUser || currentUser.id !== session.user.id;
-                currentUser = session.user;
-                if (isNewUser) {
-                    await loadAll();
-                    checkAndRunDailyRefresh(false);
-                }
-                showApp();
-                render();
-            } else {
-                currentUser = null;
-                nominatifSelected = new Set();
-                try { sessionStorage.removeItem('sipgn_nominatif_selected'); } catch (e) { /* ignore */ }
-                showAuthScreen();
-            }
+        sb.auth.onAuthStateChange((event, session) => {
+            // Deliberately not an async callback: supabase-js runs this while holding its
+            // auth lock and pushes our promise onto its pendingInLock queue. Any supabase
+            // call made from inside here (loadAll's select) re-enters _acquireLock, which
+            // awaits that queue's last entry — our own still-pending promise — and
+            // deadlocks, leaving the app rendered with an empty DB. Defer to a macrotask
+            // so the work runs after the lock is released.
+            setTimeout(() => { applyAuthSession(session); }, 0);
         });
     } else {
         showAuthError('Gagal memuat komponen login. Periksa koneksi internet, lalu muat ulang halaman.');
