@@ -995,7 +995,7 @@
             pemasok: [],
             transaksi: [],
             pembelian: [],
-            anggaran: { periode: '', bahanMakanan: 0, operasional: 0, insentifFasilitas: 0 },
+            anggaran: { periode: '', mulai: '', selesai: '', bahanMakanan: 0, operasional: 0, insentifFasilitas: 0 },
             approvals: [],
             batch: [],
             nominatif: [],
@@ -1022,6 +1022,7 @@
     let nominatifExportBusy = false;
     let biweeklyExportBusy = false;
     let slipExportId = null;
+    let bukuPeriodeIndex = 0;
 
     // ---------- storage helpers (per-user rows in Supabase, isolated by RLS) ----------
     async function loadAll() {
@@ -1604,8 +1605,13 @@
 
   <div class="card">
     <h2>Anggaran Periode Berjalan</h2>
-        <div class="grid c4">
+    <div class="grid c3">
       <div class="field"><label>Nama Periode</label><input id="f_periode" placeholder="cth: ${getCurrentPeriodName()}" value="${a.periode || getCurrentPeriodName()}"></div>
+      <div class="field"><label>Periode Mulai</label><input id="f_angMulai" type="date" value="${a.mulai || s.periodeMulai || ''}" onchange="syncAnggaranNama()"></div>
+      <div class="field"><label>Periode Selesai</label><input id="f_angSelesai" type="date" value="${a.selesai || s.periodeSelesai || ''}" onchange="syncAnggaranNama()"></div>
+    </div>
+    <p class="sub" style="margin-top:-4px;">Rentang tanggal ini yang dipakai sebagai pilihan periode saat mengunduh Buku Otomatis.</p>
+    <div class="grid c3">
       <div class="field"><label>Anggaran Bahan Makanan</label><input id="f_angBahan" type="number" value="${a.bahanMakanan || 0}"></div>
       <div class="field"><label>Anggaran Operasional</label><input id="f_angOps" type="number" value="${a.operasional || 0}"></div>
       <div class="field"><label>Anggaran Insentif Fasilitas</label><input id="f_angFas" type="number" value="${a.insentifFasilitas || 0}"></div>
@@ -1643,14 +1649,26 @@
         };
         save('setup'); toast('Profil / pengaturan disimpan');
     }
+    function syncAnggaranNama() {
+        const mulai = parseISODate(val('f_angMulai'));
+        const namaEl = document.getElementById('f_periode');
+        if (mulai && namaEl) namaEl.value = monthLabel(mulai);
+    }
     function saveAnggaran() {
+        const mulai = val('f_angMulai');
+        const selesai = val('f_angSelesai');
+        if (mulai && selesai && selesai < mulai) { toast('Periode Selesai tidak boleh sebelum Periode Mulai'); return; }
         DB.anggaran = {
             periode: val('f_periode'),
+            mulai,
+            selesai,
             bahanMakanan: Number(val('f_angBahan')) || 0,
             operasional: Number(val('f_angOps')) || 0,
             insentifFasilitas: Number(val('f_angFas')) || 0,
         };
-        save('anggaran'); toast('Anggaran disimpan');
+        // A changed range can invalidate the period picked on the Buku screen.
+        bukuPeriodeIndex = 0;
+        save('anggaran'); render(); toast('Anggaran disimpan');
     }
     function addPemasok() {
         const nama = val('p_nama'); if (!nama) { toast('Nama pemasok wajib diisi'); return; }
@@ -2382,14 +2400,50 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
         saveNominatifSelection();
         render();
     }
-    // Reporting month drives how many day columns the monthly book gets.
+    // Parsed as local time on purpose: new Date('2026-08-01') is parsed as UTC and
+    // slips to the previous day west of Greenwich, which would shift the period.
+    function parseISODate(value) {
+        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || '');
+        return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null;
+    }
+    function monthLabel(d) {
+        return d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+    }
+    // One entry per calendar month covered by the Anggaran range. A month that the
+    // range only partly covers reports just the days inside it, so the exported
+    // book gets exactly the day columns that period actually pays for.
+    function periodeOptions() {
+        const today = new Date();
+        const from = parseISODate(DB.anggaran.mulai) || parseISODate(DB.setup.periodeMulai)
+            || new Date(today.getFullYear(), today.getMonth(), 1);
+        const rangeEnd = parseISODate(DB.anggaran.selesai) || parseISODate(DB.setup.periodeSelesai);
+        const to = rangeEnd && rangeEnd >= from ? rangeEnd : new Date(from.getFullYear(), from.getMonth() + 1, 0);
+
+        const options = [];
+        const cursor = new Date(from.getFullYear(), from.getMonth(), 1);
+        while (cursor <= to && options.length < 24) {
+            const monthStart = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
+            const monthEnd = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
+            const start = monthStart < from ? from : monthStart;
+            const end = monthEnd > to ? to : monthEnd;
+            const dayCount = Math.round((end - start) / 86400000) + 1;
+            const partial = dayCount !== monthEnd.getDate();
+            options.push({
+                label: monthLabel(monthStart) + (partial ? ` (${start.getDate()}–${end.getDate()})` : ''),
+                dayCount,
+                startDay: start.getDate(),
+            });
+            cursor.setMonth(cursor.getMonth() + 1);
+        }
+        return options;
+    }
     function periodeInfo() {
-        const parsed = DB.setup.periodeMulai ? new Date(DB.setup.periodeMulai) : null;
-        const d = parsed && !isNaN(parsed) ? parsed : new Date();
-        return {
-            dayCount: new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(),
-            label: d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' }),
-        };
+        const options = periodeOptions();
+        return options[Math.min(bukuPeriodeIndex, options.length - 1)] || options[0];
+    }
+    function setBukuPeriode(index) {
+        bukuPeriodeIndex = Number(index) || 0;
+        render();
     }
     // All exports hit the same MASTER_4-based generator; they differ only in how
     // many workers/day columns are sent and what the resulting file is called.
@@ -2496,14 +2550,22 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
 
     <div class="card">
     <h2>Buku Kas &amp; Pembantu</h2>
-    <div class="note blue">Hanya transaksi yang sudah disetujui yang dihitung.</div>
-    <div class="flexend" style="margin-bottom:14px;gap:8px;">
-      <button class="btn btn-outline" ${nominatifSelected.size === 0 || biweeklyExportBusy ? 'disabled' : ''} onclick="downloadBukuBiweekly()">
-        ${biweeklyExportBusy ? 'Membuat Workbook…' : 'Unduh Buku Biweekly (10 Hari Kerja)'}
-      </button>
-      <button class="btn btn-gold" ${nominatifSelected.size === 0 || nominatifExportBusy ? 'disabled' : ''} onclick="downloadBukuOtomatis()">
-        ${nominatifExportBusy ? 'Membuat Workbook…' : `Unduh Buku Otomatis — ${periodeInfo().label} (${nominatifSelected.size} terpilih)`}
-      </button>
+    <div class="note blue" style="margin-top:0;margin-bottom:16px;">Hanya transaksi yang sudah disetujui yang dihitung.</div>
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px;">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-outline" ${nominatifSelected.size === 0 || biweeklyExportBusy ? 'disabled' : ''} onclick="downloadBukuBiweekly()">
+          ${biweeklyExportBusy ? 'Membuat Workbook…' : 'Unduh Buku Biweekly (10 Hari Kerja)'}
+        </button>
+        <button class="btn btn-gold" ${nominatifSelected.size === 0 || nominatifExportBusy ? 'disabled' : ''} onclick="downloadBukuOtomatis()">
+          ${nominatifExportBusy ? 'Membuat Workbook…' : `Unduh Buku Bulanan (${nominatifSelected.size} terpilih)`}
+        </button>
+      </div>
+      <div class="field" style="margin-bottom:0;min-width:240px;">
+        <label>Periode Anggaran</label>
+        <select onchange="setBukuPeriode(this.value)">
+          ${periodeOptions().map((o, i) => `<option value="${i}" ${i === bukuPeriodeIndex ? 'selected' : ''}>${o.label} · ${o.dayCount} hari</option>`).join('')}
+        </select>
+      </div>
     </div>
     <div class="subtabs">${subs.map(s => `<button class="subtab ${s.id === bukuSubtab ? 'active' : ''}" onclick="setBukuSub('${s.id}')">${s.label}</button>`).join('')}</div>
     ${body}
