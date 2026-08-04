@@ -1001,6 +1001,7 @@
     let nominatifFilterDept = 'Semua';
     let nominatifSelected = new Set();
     let nominatifExportBusy = false;
+    let ledgerExportBusy = false;
 
     // ---------- storage helpers (per-user rows in Supabase, isolated by RLS) ----------
     async function loadAll() {
@@ -2439,11 +2440,88 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
         else if (bukuSubtab === 'catatan') body = bukuCatatan();
         return `
     <div class="note blue">Hanya transaksi yang sudah disetujui yang dihitung.</div>
+    <div class="flexend" style="margin-bottom:14px;">
+      <button class="btn btn-gold" ${ledgerExportBusy ? 'disabled' : ''} onclick="downloadLedgerWorkbook()">
+        ${ledgerExportBusy ? 'Membuat Workbook…' : 'Unduh Workbook Multi-Sheet (.xlsx)'}
+      </button>
+    </div>
     <div class="subtabs">${subs.map(s => `<button class="subtab ${s.id === bukuSubtab ? 'active' : ''}" onclick="setBukuSub('${s.id}')">${s.label}</button>`).join('')}</div>
     ${body}
   `;
     }
     function setBukuSub(id) { bukuSubtab = id; render(); }
+    function buildLedgerSheets() {
+        const bkuHeaders = ['Tanggal', 'No Bukti', 'Uraian', 'Debit', 'Kredit', 'Saldo'];
+        const sheets = [{
+            name: 'BKU',
+            headers: bkuHeaders,
+            rows: ledgerAllKas().map(r => [fmtDate(r.tanggal), r.noBukti || '-', r.uraian, r.d || 0, r.k || 0, r.saldo]),
+        }];
+
+        DB.coa.filter(c => c.kategori === 'Kas').forEach(ka => {
+            sheets.push({
+                name: `BP Kas - ${ka.nama}`,
+                headers: bkuHeaders,
+                rows: ledgerForKas(ka.kode).map(r => [fmtDate(r.tanggal), r.noBukti || '-', r.uraian, r.d || 0, r.k || 0, r.saldo]),
+            });
+        });
+
+        const bpHeaders = ['Tanggal', 'Uraian', 'Dana Masuk', 'Biaya', 'Saldo'];
+        [
+            { kodeMasuk: '2000', kodeBiaya: '2010', label: 'BP Bahan Baku' },
+            { kodeMasuk: '2100', kodeBiaya: '2110', label: 'BP Operasional' },
+            { kodeMasuk: '2150', kodeBiaya: '2160', label: 'BP Fasilitas' },
+        ].forEach(({ kodeMasuk, kodeBiaya, label }) => {
+            sheets.push({
+                name: label,
+                headers: bpHeaders,
+                rows: ledgerBP(kodeMasuk, kodeBiaya).map(r => [fmtDate(r.tanggal), r.uraian, r.masuk || 0, r.keluar || 0, r.saldo]),
+            });
+        });
+
+        const kodePajak = DB.coa.filter(c => c.kategori === 'Pajak').map(c => c.kode);
+        sheets.push({
+            name: 'BP Pajak',
+            headers: ['Tanggal', 'Jenis Pajak', 'Uraian', 'Jumlah'],
+            rows: sortedTransaksi().filter(t => kodePajak.includes(t.akunLawan))
+                .map(r => [fmtDate(r.tanggal), coaByKode(r.akunLawan)?.nama || '-', r.uraian, r.jumlah]),
+        });
+
+        sheets.push({
+            name: 'Catatan Pengeluaran',
+            headers: ['Tanggal', 'Uraian', 'Kategori', 'Jumlah'],
+            rows: sortedTransaksi().filter(t => t.tipe === 'K')
+                .map(r => [fmtDate(r.tanggal), r.uraian, coaByKode(r.akunLawan)?.kategori || '-', r.jumlah]),
+        });
+
+        return sheets;
+    }
+    async function downloadLedgerWorkbook() {
+        if (ledgerExportBusy) return;
+        ledgerExportBusy = true; render();
+        try {
+            const res = await fetch('/api/report/generate-ledger-workbook', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sheets: buildLedgerSheets() }),
+                signal: AbortSignal.timeout(30000)
+            });
+            if (!res.ok) {
+                const body = await res.json().catch(() => null);
+                throw new Error(body?.message || 'Gagal membuat workbook');
+            }
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'Buku_Otomatis.xlsx'; a.click();
+            URL.revokeObjectURL(url);
+            toast('Workbook Buku Otomatis berhasil diunduh');
+        } catch (error) {
+            toast(error.message || 'Koneksi ke server gagal, workbook tidak dapat dibuat');
+        } finally {
+            ledgerExportBusy = false; render();
+        }
+    }
 
     function bukuBKU() {
         const rows = ledgerAllKas();
