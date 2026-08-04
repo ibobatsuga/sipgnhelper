@@ -41,6 +41,11 @@
         margin: 0;
         padding: 0;
         font-family: var(--font-main);
+        /* Without a base size, anything that never declared one (the running
+           totals in the purchase form, the Kas stat blocks) fell back to the
+           browser's 16px and sat oddly large next to the 12.5px scale the rest
+           of the UI uses. Icons keep their own explicit 16px. */
+        font-size: 12.5px;
         background-color: var(--bg-app);
         color: var(--text-main);
         -webkit-font-smoothing: antialiased;
