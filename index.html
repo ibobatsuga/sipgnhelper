@@ -844,6 +844,13 @@
                     <p id="header-subtitle">Ringkasan transaksi, otomatisasi SCM &amp; laporan keuangan SPPG</p>
                 </div>
                 <div class="header-right">
+                    <div class="header-refresh-status" style="display:flex; align-items:center; gap:8px; font-size:12px; background:rgba(22, 163, 74, 0.1); border:1px solid rgba(22, 163, 74, 0.25); padding:6px 14px; border-radius:20px; color:#15803d;" title="Otomatis memperbarui data & periode setiap hari 1x">
+                        <span style="width:8px; height:8px; border-radius:50%; background:#16a34a; display:inline-block; box-shadow:0 0 6px #16a34a;"></span>
+                        <span id="daily-refresh-text">Up-to-Date (Auto 1x Hari)</span>
+                    </div>
+                    <button class="btn" onclick="triggerManualDailyRefresh()" style="font-size:12px; padding:6px 12px; display:flex; align-items:center; gap:6px; border:1px solid #cbd5e1; border-radius:8px; background:#ffffff; color:#0f172a; cursor:pointer; font-weight:600;" title="Refresh Data & Periode Hari Ini">
+                        🔄 Refresh Hari Ini
+                    </button>
                     <button class="header-icon-btn" onclick="setTab('approval')" title="Notifikasi Approval">
                         🔔 <span class="header-dot" id="header-dot" style="display:none;"></span>
                     </button>
@@ -958,6 +965,72 @@
     }
     function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
     function todayStr() { return new Date().toISOString().slice(0, 10); }
+    function getCurrentPeriodName() {
+        const now = new Date();
+        return now.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+    }
+
+    function checkAndRunDailyRefresh(force = false) {
+        const today = todayStr();
+        let lastRefresh = '';
+        try { lastRefresh = localStorage.getItem('sipgn_last_daily_refresh') || ''; } catch(e){}
+
+        const currentPeriod = getCurrentPeriodName();
+        let updated = false;
+
+        // Auto update period if empty or set to previous static auto-period like Mei
+        if (!DB.anggaran.periode || DB.anggaran.periode.trim() === '' || DB.anggaran.periode.toLowerCase().includes('mei')) {
+            DB.anggaran.periode = currentPeriod;
+            save('anggaran');
+            updated = true;
+        }
+
+        // Auto set default start/end dates for setup if empty
+        if (!DB.setup.periodeMulai) {
+            const now = new Date();
+            const yyyy = now.getFullYear();
+            const mm = String(now.getMonth() + 1).padStart(2, '0');
+            DB.setup.periodeMulai = `${yyyy}-${mm}-01`;
+            save('setup');
+            updated = true;
+        }
+        if (!DB.setup.periodeSelesai) {
+            const now = new Date();
+            const yyyy = now.getFullYear();
+            const mm = String(now.getMonth() + 1).padStart(2, '0');
+            const lastDay = new Date(yyyy, now.getMonth() + 1, 0).getDate();
+            DB.setup.periodeSelesai = `${yyyy}-${mm}-${String(lastDay).padStart(2, '0')}`;
+            save('setup');
+            updated = true;
+        }
+
+        if (force || lastRefresh !== today || updated) {
+            try {
+                localStorage.setItem('sipgn_last_daily_refresh', today);
+                localStorage.setItem('sipgn_last_refresh_time', new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }));
+            } catch(e){}
+
+            updateHeaderRefreshBadge(today);
+            if (force) {
+                toast(`Dashboard diperbarui ke tanggal hari ini (${fmtDate(today)})`);
+                render();
+            }
+        } else {
+            updateHeaderRefreshBadge(today);
+        }
+    }
+
+    function updateHeaderRefreshBadge(today) {
+        const textEl = document.getElementById('daily-refresh-text');
+        if (textEl) {
+            const timeStr = localStorage.getItem('sipgn_last_refresh_time') || new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+            textEl.textContent = `Up-to-Date (${fmtDate(today)} ${timeStr})`;
+        }
+    }
+
+    function triggerManualDailyRefresh() {
+        checkAndRunDailyRefresh(true);
+    }
     function rupiah(n) { n = Number(n) || 0; return 'Rp ' + n.toLocaleString('id-ID'); }
     function fmtDate(d) { if (!d) return '-'; const dt = new Date(d); return dt.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }); }
     function coaByKode(k) { return DB.coa.find(c => c.kode === k); }
@@ -1000,24 +1073,16 @@
         return canvas.toDataURL('image/jpeg', quality).split(',')[1];
     }
     async function extractReceiptJSON(fullB64) {
-        const prompt = 'Ekstrak data dari foto struk/nota belanja ini. Balas HANYA dengan JSON valid, tanpa teks lain, tanpa markdown, format persis: {"tanggal":"YYYY-MM-DD","vendor":"nama toko","items":[{"nama":"nama barang","jumlah":1,"harga":0}],"total":0}. Jika tanggal tidak jelas terbaca, gunakan tanggal hari ini (' + todayStr() + '). Angka harga/total tanpa titik/koma pemisah ribuan.';
-        const resp = await fetch('https://api.anthropic.com/v1/messages', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                model: 'claude-sonnet-4-6', max_tokens: 1000,
-                messages: [{
-                    role: 'user', content: [
-                        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: fullB64 } },
-                        { type: 'text', text: prompt }
-                    ]
-                }]
-            })
+        const resp = await fetch('/api/receipt/extract', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ imageBase64: fullB64 })
         });
-        const data = await resp.json();
-        const textBlock = (data.content || []).find(b => b.type === 'text');
-        if (!textBlock) throw new Error('Tidak ada respons teks dari model');
-        const clean = textBlock.text.replace(/```json|```/g, '').trim();
-        return JSON.parse(clean);
+        const data = await resp.json().catch(() => null);
+        if (!resp.ok || !data || !data.success) {
+            throw new Error(data?.message || 'Layanan pembaca struk tidak merespons');
+        }
+        return data.data;
     }
 
     // ---------- shared OCR queue (dipakai bersama tim, shared=true) ----------
@@ -1261,7 +1326,7 @@
             <div class="hero-title">Aktivitas SCM &amp; Keuangan</div>
             <div class="hero-val">${jmlTransaksi} Transaksi Total</div>
           </div>
-          <span class="hero-badge-pill">Periode Berjalan</span>
+          <span class="hero-badge-pill">Periode ${DB.anggaran.periode || getCurrentPeriodName()}</span>
         </div>
         <div style="margin: 14px 0 6px 0; font-size: 12px; opacity: 0.9; line-height: 1.6;">
           Statistik pengadaan bahan baku, transaksi operasional &amp; sinkronisasi laporan otomatis SPPG.
@@ -1429,7 +1494,7 @@
   <div class="card">
     <h2>Anggaran Periode Berjalan</h2>
         <div class="grid c4">
-      <div class="field"><label>Nama Periode</label><input id="f_periode" placeholder="cth: Mei 2026" value="${a.periode || ''}"></div>
+      <div class="field"><label>Nama Periode</label><input id="f_periode" placeholder="cth: ${getCurrentPeriodName()}" value="${a.periode || getCurrentPeriodName()}"></div>
       <div class="field"><label>Anggaran Bahan Makanan</label><input id="f_angBahan" type="number" value="${a.bahanMakanan || 0}"></div>
       <div class="field"><label>Anggaran Operasional</label><input id="f_angOps" type="number" value="${a.operasional || 0}"></div>
       <div class="field"><label>Anggaran Insentif Fasilitas</label><input id="f_angFas" type="number" value="${a.insentifFasilitas || 0}"></div>
@@ -1750,7 +1815,7 @@
             if (el) el.innerHTML = renderOcrQueueListHtml();
         } catch (e) {
             console.error(e);
-            toast('Gagal membaca struk — coba foto yang lebih jelas/terang');
+            toast(e instanceof Error ? e.message : 'Gagal membaca struk');
         } finally {
             btn.textContent = 'Baca & Kirim Struk'; btn.disabled = false;
         }
@@ -2362,7 +2427,20 @@ Status Review     : ${s.reviewed ? 'Sudah direview' : 'Belum direview'}</div>
     // ---------- init ----------
     (async function init() {
         await loadAll();
+        checkAndRunDailyRefresh(false);
         render();
+
+        // Check & refresh daily at background interval (every 5 minutes)
+        setInterval(() => {
+            checkAndRunDailyRefresh(false);
+        }, 300000);
+
+        // Check whenever user switches back to this tab
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                checkAndRunDailyRefresh(false);
+            }
+        });
     })();
 </script>
 </body>

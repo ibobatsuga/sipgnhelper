@@ -13,7 +13,7 @@ export interface DataItem {
 
 interface DataManagerProps {
   items: DataItem[];
-  onAddItem: (newItem: { name: string; category: string; value: number }) => void;
+  onAddItem: (newItem: { name: string; category: string; value: number }) => Promise<boolean>;
   onUpdateStatus: (id: string, status: DataItem['status']) => void;
   onDeleteItem: (id: string) => void;
   isLoading: boolean;
@@ -34,6 +34,7 @@ export const DataManager: React.FC<DataManagerProps> = ({
   const [newName, setNewName] = useState('');
   const [newCategory, setNewCategory] = useState('Distribusi');
   const [newValue, setNewValue] = useState(1000);
+  const [isSaving, setIsSaving] = useState(false);
 
   const categories = ['All', 'Distribusi', 'Pelanggan', 'Metering', 'Tagihan', 'Audit'];
 
@@ -46,12 +47,19 @@ export const DataManager: React.FC<DataManagerProps> = ({
     return matchesSearch && matchesCategory;
   });
 
-  const handleSubmitNewItem = (e: React.FormEvent) => {
+  const handleSubmitNewItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim()) return;
-    onAddItem({ name: newName, category: newCategory, value: Number(newValue) });
-    setNewName('');
-    setShowAddModal(false);
+    setIsSaving(true);
+    try {
+      const wasSaved = await onAddItem({ name: newName, category: newCategory, value: Number(newValue) });
+      if (wasSaved) {
+        setNewName('');
+        setShowAddModal(false);
+      }
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -248,8 +256,8 @@ export const DataManager: React.FC<DataManagerProps> = ({
                 <button type="button" className="btn-secondary" onClick={() => setShowAddModal(false)}>
                   Batal
                 </button>
-                <button type="submit" className="btn-primary">
-                  Simpan Data
+                <button type="submit" className="btn-primary" disabled={isSaving}>
+                  {isSaving ? 'Menyimpan...' : 'Simpan Data'}
                 </button>
               </div>
             </form>

@@ -10,6 +10,21 @@ export interface DataItem {
   value: number;
 }
 
+const VALID_STATUSES: ReadonlySet<DataItem['status']> = new Set([
+  'active',
+  'pending',
+  'completed',
+  'failed',
+]);
+
+const MAX_TEXT_LENGTH = 120;
+
+const isValidText = (value: unknown): value is string =>
+  typeof value === 'string' && value.trim().length > 0 && value.trim().length <= MAX_TEXT_LENGTH;
+
+const isValidValue = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value) && value >= 0;
+
 let mockDataItems: DataItem[] = [
   { id: '1', code: 'SIP-1001', name: 'Pelaporan Distribusi Gas Wilayah I', category: 'Distribusi', status: 'completed', lastUpdated: new Date(Date.now() - 3600000).toISOString(), value: 4500 },
   { id: '2', code: 'SIP-1002', name: 'Rekonsiliasi Pelanggan Industri', category: 'Pelanggan', status: 'active', lastUpdated: new Date(Date.now() - 7200000).toISOString(), value: 12800 },
@@ -48,19 +63,22 @@ export const getDataItems = (req: Request, res: Response) => {
 
 export const addDataItem = (req: Request, res: Response) => {
   const { name, category, value } = req.body;
-  if (!name || !category) {
-    res.status(400).json({ success: false, message: 'Name and category are required' });
+  if (!isValidText(name) || !isValidText(category) || !isValidValue(value)) {
+    res.status(400).json({
+      success: false,
+      message: 'Name and category must be non-empty text up to 120 characters; value must be a finite non-negative number',
+    });
     return;
   }
 
   const newItem: DataItem = {
-    id: (mockDataItems.length + 1).toString(),
-    code: `SIP-${1000 + mockDataItems.length + 1}`,
-    name,
-    category,
+    id: crypto.randomUUID(),
+    code: `SIP-${1000 + mockDataItems.length + 1}-${Date.now()}`,
+    name: name.trim(),
+    category: category.trim(),
     status: 'pending',
     lastUpdated: new Date().toISOString(),
-    value: Number(value) || 0
+    value
   };
 
   mockDataItems.unshift(newItem);
@@ -77,10 +95,13 @@ export const updateDataItemStatus = (req: Request, res: Response) => {
     return;
   }
 
-  if (status) {
-    item.status = status;
-    item.lastUpdated = new Date().toISOString();
+  if (!VALID_STATUSES.has(status)) {
+    res.status(400).json({ success: false, message: 'Invalid status' });
+    return;
   }
+
+  item.status = status;
+  item.lastUpdated = new Date().toISOString();
 
   res.json({ success: true, data: item });
 };

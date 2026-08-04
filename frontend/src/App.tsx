@@ -11,6 +11,8 @@ export const App: React.FC = () => {
   const [automationTasks, setAutomationTasks] = useState<AutomationTask[]>([]);
   const [logs, setLogs] = useState<AutomationLog[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [lastRefreshTime, setLastRefreshTime] = useState<string>('');
+  const [requestError, setRequestError] = useState<string>('');
 
   const fetchBackendData = async () => {
     setIsLoading(true);
@@ -43,6 +45,8 @@ export const App: React.FC = () => {
         const json = await logRes.json();
         setLogs(json.data || []);
       }
+
+      setLastRefreshTime(new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }));
     } catch (err) {
       console.warn('Backend server disconnected or unreachable:', err);
       setServerStatus('disconnected');
@@ -53,9 +57,28 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     fetchBackendData();
+
+    // Auto-refresh daily (check every 5 minutes)
+    const interval = setInterval(() => {
+      fetchBackendData();
+    }, 300000);
+
+    // Auto refresh when user comes back to the browser tab
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchBackendData();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
-  const handleAddItem = async (newItem: { name: string; category: string; value: number }) => {
+  const handleAddItem = async (newItem: { name: string; category: string; value: number }): Promise<boolean> => {
+    setRequestError('');
     try {
       const res = await fetch('/api/data', {
         method: 'POST',
@@ -63,11 +86,16 @@ export const App: React.FC = () => {
         body: JSON.stringify(newItem),
       });
       if (res.ok) {
-        fetchBackendData();
+        await fetchBackendData();
+        return true;
       }
+      const body = await res.json().catch(() => null);
+      setRequestError(body?.message || 'Data tidak dapat disimpan. Silakan coba lagi.');
     } catch (err) {
       console.error('Error adding item:', err);
+      setRequestError('Koneksi ke server gagal. Data tidak disimpan.');
     }
+    return false;
   };
 
   const handleUpdateStatus = async (id: string, status: DataItem['status']) => {
@@ -81,6 +109,9 @@ export const App: React.FC = () => {
         setDataItems((prev) =>
           prev.map((item) => (item.id === id ? { ...item, status, lastUpdated: new Date().toISOString() } : item))
         );
+      } else {
+        setRequestError('Status data tidak dapat diperbarui. Data terbaru dimuat ulang.');
+        await fetchBackendData();
       }
     } catch (err) {
       console.error('Error updating status:', err);
@@ -94,6 +125,9 @@ export const App: React.FC = () => {
       });
       if (res.ok) {
         setDataItems((prev) => prev.filter((item) => item.id !== id));
+      } else {
+        setRequestError('Data tidak dapat dihapus. Data terbaru dimuat ulang.');
+        await fetchBackendData();
       }
     } catch (err) {
       console.error('Error deleting item:', err);
@@ -114,9 +148,14 @@ export const App: React.FC = () => {
         setTimeout(() => {
           fetchBackendData();
         }, 3000);
+      } else {
+        setRequestError('Tugas tidak dapat dijalankan. Status terbaru dimuat ulang.');
+        await fetchBackendData();
       }
     } catch (err) {
       console.error('Error running task:', err);
+      setRequestError('Koneksi ke server gagal. Status terbaru dimuat ulang.');
+      await fetchBackendData();
     }
   };
 
@@ -125,7 +164,13 @@ export const App: React.FC = () => {
 
   return (
     <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '24px 16px' }}>
-      <Header serverStatus={serverStatus} onRefresh={fetchBackendData} />
+      <Header serverStatus={serverStatus} lastRefreshTime={lastRefreshTime} onRefresh={fetchBackendData} />
+
+      {requestError && (
+        <p role="alert" style={{ margin: '0 0 16px', color: 'var(--accent-rose)' }}>
+          {requestError}
+        </p>
+      )}
 
       <OverviewCards
         totalRecords={dataItems.length}

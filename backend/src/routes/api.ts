@@ -10,6 +10,7 @@ import {
   getLogs, 
   runTask 
 } from '../controllers/automationController.js';
+import { extractReceipt } from '../controllers/receiptController.js';
 
 const router = Router();
 
@@ -28,5 +29,8 @@ router.delete('/data/:id', deleteDataItem);
 router.get('/automation/tasks', getTasks);
 router.post('/automation/tasks/:taskId/run', runTask);
 router.get('/automation/logs', getLogs);
+
+// Receipt OCR (the provider key is kept on the server)
+router.post('/receipt/extract', extractReceipt);
 
 export default router;

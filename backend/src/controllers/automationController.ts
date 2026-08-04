@@ -32,6 +32,15 @@ let mockLogs: AutomationLog[] = [
   { id: 'log-4', timestamp: new Date(Date.now() - 3600000).toISOString(), taskId: 'task-3', taskName: 'Generate Laporan Harian SIPGN', level: 'success', message: 'Laporan PDF & Excel harian berhasil dibentuk di storage.' }
 ];
 
+const MAX_LOG_ENTRIES = 500;
+
+const prependLog = (log: AutomationLog) => {
+  mockLogs.unshift(log);
+  if (mockLogs.length > MAX_LOG_ENTRIES) {
+    mockLogs.length = MAX_LOG_ENTRIES;
+  }
+};
+
 export const getTasks = (req: Request, res: Response) => {
   res.json({ success: true, data: mockTasks });
 };
@@ -49,6 +58,11 @@ export const runTask = (req: Request, res: Response) => {
     return;
   }
 
+  if (task.status === 'running') {
+    res.status(409).json({ success: false, message: `Task '${task.name}' is already running` });
+    return;
+  }
+
   task.status = 'running';
   
   // Add log entry
@@ -60,7 +74,7 @@ export const runTask = (req: Request, res: Response) => {
     level: 'info',
     message: `Proses '${task.name}' mulai dijalankan...`
   };
-  mockLogs.unshift(startLog);
+  prependLog(startLog);
 
   // Simulate async task execution finish
   setTimeout(() => {
@@ -75,7 +89,7 @@ export const runTask = (req: Request, res: Response) => {
       level: 'success',
       message: `Proses '${task.name}' selesai dilaksanakan dengan sukses.`
     };
-    mockLogs.unshift(finishLog);
+    prependLog(finishLog);
   }, 2500);
 
   res.json({ success: true, message: `Task '${task.name}' started`, data: task });
