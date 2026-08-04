@@ -1073,16 +1073,24 @@
         return canvas.toDataURL('image/jpeg', quality).split(',')[1];
     }
     async function extractReceiptJSON(fullB64) {
-        const resp = await fetch('/api/receipt/extract', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ imageBase64: fullB64 })
-        });
-        const data = await resp.json().catch(() => null);
-        if (!resp.ok || !data || !data.success) {
-            throw new Error(data?.message || 'Layanan pembaca struk tidak merespons');
+        try {
+            const resp = await fetch('/api/receipt/extract', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ imageBase64: fullB64 }),
+                signal: AbortSignal.timeout(35000)
+            });
+            const data = await resp.json().catch(() => null);
+            if (!resp.ok || !data || !data.success) {
+                throw new Error(data?.message || 'Layanan pembaca struk tidak merespons');
+            }
+            return data.data;
+        } catch (error) {
+            if (error instanceof DOMException && error.name === 'TimeoutError') {
+                throw new Error('Waktu pembacaan struk habis. Coba lagi.');
+            }
+            throw error;
         }
-        return data.data;
     }
 
     // ---------- shared OCR queue (dipakai bersama tim, shared=true) ----------

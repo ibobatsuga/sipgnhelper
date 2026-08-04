@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-const DEFAULT_MODEL = 'qwen/qwen3.6-27b';
+const DEFAULT_MODEL = 'gemini-3.5-flash';
 
 type ReceiptItem = { nama: string; jumlah: number; harga: number };
 type Receipt = { tanggal: string; vendor: string; items: ReceiptItem[]; total: number };
@@ -44,30 +44,33 @@ export const extractReceipt = async (req: Request, res: Response) => {
     return;
   }
 
-  const apiKey = process.env.GROQ_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     res.status(503).json({ success: false, message: 'Layanan pembaca struk belum dikonfigurasi' });
     return;
   }
 
   try {
-    const upstream = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    const model = process.env.GEMINI_MODEL || DEFAULT_MODEL;
+    const upstream = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        authorization: `Bearer ${apiKey}`,
+        'x-goog-api-key': apiKey,
       },
       body: JSON.stringify({
-        model: process.env.GROQ_MODEL || DEFAULT_MODEL,
-        max_tokens: 1000,
-        response_format: { type: 'json_object' },
-        messages: [{
+        contents: [{
           role: 'user',
-          content: [
-            { type: 'text', text: receiptPrompt(new Date().toISOString().slice(0, 10)) },
-            { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${imageBase64}` } },
+          parts: [
+            { text: receiptPrompt(new Date().toISOString().slice(0, 10)) },
+            { inlineData: { mimeType: 'image/jpeg', data: imageBase64 } },
           ],
         }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          temperature: 0.1,
+          maxOutputTokens: 2048,
+        },
       }),
       signal: AbortSignal.timeout(30_000),
     });
@@ -83,8 +86,8 @@ export const extractReceipt = async (req: Request, res: Response) => {
       return;
     }
 
-    const body = await upstream.json() as { choices?: Array<{ message?: { content?: string } }> };
-    const text = body.choices?.[0]?.message?.content;
+    const body = await upstream.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
+    const text = body.candidates?.[0]?.content?.parts?.find((part) => typeof part.text === 'string')?.text;
     if (!text) throw new Error('Missing text content in provider response');
 
     const receipt: unknown = JSON.parse(stripCodeFence(text));
@@ -95,6 +98,7 @@ export const extractReceipt = async (req: Request, res: Response) => {
 
     res.json({ success: true, data: receipt });
   } catch (error) {
+    console.error('Receipt extraction failed:', error instanceof Error ? error.message : error);
     const message = error instanceof Error && error.name === 'TimeoutError'
       ? 'Waktu pembacaan struk habis. Coba lagi.'
       : 'Layanan pembaca struk mengalami gangguan';
