@@ -171,14 +171,20 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.readFile(TEMPLATE_PATH);
-    workbook.calcProperties.fullCalcOnLoad = true;
-
-    const templateSheet = workbook.getWorksheet(TEMPLATE_SHEET_NAME);
+    // MASTER_4 is read purely as a style source and never re-serialized: ExcelJS
+    // models only a subset of OOXML, so writing that workbook back out drops its
+    // pivot caches, external links, comments and all but a handful of its 243
+    // defined names, which makes Excel report the download as corrupt and
+    // "repair" it. Emitting a fresh workbook that only holds the generated
+    // DafNom-shaped sheets keeps the layout identical with nothing to repair.
+    const templateWorkbook = new ExcelJS.Workbook();
+    await templateWorkbook.xlsx.readFile(TEMPLATE_PATH);
+    const templateSheet = templateWorkbook.getWorksheet(TEMPLATE_SHEET_NAME);
     if (!templateSheet) throw new Error(`Sheet template '${TEMPLATE_SHEET_NAME}' tidak ditemukan pada MASTER_4.xlsx`);
 
-    const usedNames = new Set(workbook.worksheets.map((sheet) => sheet.name.toLowerCase()));
+    const workbook = new ExcelJS.Workbook();
+    workbook.calcProperties.fullCalcOnLoad = true;
+    const usedNames = new Set();
     workers.forEach((worker, index) => {
       const sheetName = sanitizeSheetName(worker.nama, `Personel ${index + 1}`, usedNames);
       const sheet = workbook.addWorksheet(sheetName, {
