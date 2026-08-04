@@ -1015,6 +1015,7 @@
     let nominatifFilterDept = 'Semua';
     let nominatifSelected = new Set();
     let nominatifExportBusy = false;
+    let biweeklyExportBusy = false;
     let slipExportId = null;
 
     // ---------- storage helpers (per-user rows in Supabase, isolated by RLS) ----------
@@ -2376,13 +2377,22 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
         saveNominatifSelection();
         render();
     }
-    // Both exports hit the same MASTER_4-based generator; they differ only in how
-    // many workers are sent and what the resulting file is called.
-    async function requestWorkbook(workers, filename) {
+    // Reporting month drives how many day columns the monthly book gets.
+    function periodeInfo() {
+        const parsed = DB.setup.periodeMulai ? new Date(DB.setup.periodeMulai) : null;
+        const d = parsed && !isNaN(parsed) ? parsed : new Date();
+        return {
+            dayCount: new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(),
+            label: d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' }),
+        };
+    }
+    // All exports hit the same MASTER_4-based generator; they differ only in how
+    // many workers/day columns are sent and what the resulting file is called.
+    async function requestWorkbook(workers, filename, dayCount, periodeLabel) {
         const res = await fetch('/api/report/generate-workbook', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ workers, filename }),
+            body: JSON.stringify({ workers, filename, dayCount, periodeLabel }),
             signal: AbortSignal.timeout(30000)
         });
         if (!res.ok) {
@@ -2398,24 +2408,40 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
     async function downloadBukuOtomatis() {
         const workers = DB.nominatif.filter(n => nominatifSelected.has(n.id));
         if (workers.length === 0) { toast('Pilih minimal satu personel dulu'); return; }
+        const { dayCount, label } = periodeInfo();
         nominatifExportBusy = true; render();
         try {
-            await requestWorkbook(workers, 'Buku_Otomatis_Nominatif.xlsx');
-            toast(`Workbook untuk ${workers.length} personel berhasil diunduh`);
+            await requestWorkbook(workers, 'Buku_Otomatis_Nominatif.xlsx', dayCount, label);
+            toast(`Buku ${label} untuk ${workers.length} personel berhasil diunduh`);
         } catch (error) {
             toast(error.message || 'Koneksi ke server gagal, workbook tidak dapat dibuat');
         } finally {
             nominatifExportBusy = false; render();
         }
     }
+    async function downloadBukuBiweekly() {
+        const workers = DB.nominatif.filter(n => nominatifSelected.has(n.id));
+        if (workers.length === 0) { toast('Pilih minimal satu personel dulu'); return; }
+        biweeklyExportBusy = true; render();
+        try {
+            // 10 day columns is DafNom's native span: two blocks of five working days.
+            await requestWorkbook(workers, 'Buku_Biweekly_Nominatif.xlsx', 10, periodeInfo().label);
+            toast(`Buku biweekly untuk ${workers.length} personel berhasil diunduh`);
+        } catch (error) {
+            toast(error.message || 'Koneksi ke server gagal, workbook tidak dapat dibuat');
+        } finally {
+            biweeklyExportBusy = false; render();
+        }
+    }
     async function downloadSlipGaji(id) {
         if (slipExportId) return;
         const worker = DB.nominatif.find(n => n.id === id);
         if (!worker) { toast('Data personel tidak ditemukan'); return; }
+        const { dayCount, label } = periodeInfo();
         slipExportId = id; render();
         try {
             const safeName = worker.nama.replace(/[^\w-]+/g, '_').slice(0, 40) || 'Personel';
-            await requestWorkbook([worker], `Slip_Gaji_${safeName}.xlsx`);
+            await requestWorkbook([worker], `Slip_Gaji_${safeName}.xlsx`, dayCount, label);
             toast(`Slip gaji ${worker.nama} berhasil diunduh`);
         } catch (error) {
             toast(error.message || 'Koneksi ke server gagal, slip tidak dapat dibuat');
@@ -2466,9 +2492,12 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
     <div class="card">
     <h2>Buku Kas &amp; Pembantu</h2>
     <div class="note blue">Hanya transaksi yang sudah disetujui yang dihitung.</div>
-    <div class="flexend" style="margin-bottom:14px;">
+    <div class="flexend" style="margin-bottom:14px;gap:8px;">
+      <button class="btn btn-outline" ${nominatifSelected.size === 0 || biweeklyExportBusy ? 'disabled' : ''} onclick="downloadBukuBiweekly()">
+        ${biweeklyExportBusy ? 'Membuat Workbook…' : 'Unduh Buku Biweekly (10 Hari Kerja)'}
+      </button>
       <button class="btn btn-gold" ${nominatifSelected.size === 0 || nominatifExportBusy ? 'disabled' : ''} onclick="downloadBukuOtomatis()">
-        ${nominatifExportBusy ? 'Membuat Workbook…' : `Unduh Buku Otomatis (${nominatifSelected.size} terpilih)`}
+        ${nominatifExportBusy ? 'Membuat Workbook…' : `Unduh Buku Otomatis — ${periodeInfo().label} (${nominatifSelected.size} terpilih)`}
       </button>
     </div>
     <div class="subtabs">${subs.map(s => `<button class="subtab ${s.id === bukuSubtab ? 'active' : ''}" onclick="setBukuSub('${s.id}')">${s.label}</button>`).join('')}</div>
