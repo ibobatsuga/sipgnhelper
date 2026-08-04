@@ -1,7 +1,7 @@
 {
   "version": 2,
   "builds": [
-    { "src": "api/**/*.js", "use": "@vercel/node" },
+    { "src": "api/**/*.js", "use": "@vercel/node", "config": { "includeFiles": "api/report/templates/**" } },
     { "src": "index.html", "use": "@vercel/static" }
   ],
   "routes": [

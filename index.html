@@ -892,6 +892,7 @@
         { kode: '2170', nama: 'PPN', kategori: 'Pajak' },
         { kode: '2180', nama: 'PPh 21/22/23', kategori: 'Pajak' },
         { kode: '2190', nama: 'PPh Pasal 4(2)', kategori: 'Pajak' },
+        { kode: '2195', nama: 'Biaya Admin Bank/Layanan', kategori: 'Biaya Administrasi' },
     ];
 
     const JENIS_PEKERJAAN = [
@@ -905,6 +906,8 @@
         { label: 'Petugas Kebersihan', tarif: 100000 },
         { label: 'Penanggung Jawab (Honorarium)', tarif: 50000 },
     ];
+
+    const DEPARTEMEN_LIST = ['Dapur', 'Distribusi', 'Kebersihan', 'Keamanan', 'Administrasi'];
 
     let DB = {
         setup: {
@@ -927,6 +930,9 @@
     let draftPembelian = null; // in-progress pembelian form
     let editingPembelianId = null;
     let ocrBusy = false;
+    let nominatifFilterDept = 'Semua';
+    let nominatifSelected = new Set();
+    let nominatifExportBusy = false;
 
     // ---------- storage helpers ----------
     async function loadAll() {
@@ -947,6 +953,7 @@
         }
         if (!DB.coa || DB.coa.length === 0) DB.coa = DEFAULT_COA.slice();
         if (DB.setup.approvalThreshold === undefined) DB.setup.approvalThreshold = 500000;
+        loadNominatifSelection();
     }
     async function save(key) {
         try {
@@ -956,6 +963,18 @@
                 localStorage.setItem('sipgn_' + key, JSON.stringify(DB[key]));
             }
         } catch (e) { console.error('storage save failed', key, e); }
+    }
+    // Keeps the "Buku Otomatis" checkbox selection alive across an accidental page refresh.
+    function loadNominatifSelection() {
+        try {
+            const raw = sessionStorage.getItem('sipgn_nominatif_selected');
+            const ids = raw ? JSON.parse(raw) : [];
+            const validIds = new Set(DB.nominatif.map(n => n.id));
+            nominatifSelected = new Set(ids.filter(id => validIds.has(id)));
+        } catch (e) { nominatifSelected = new Set(); }
+    }
+    function saveNominatifSelection() {
+        try { sessionStorage.setItem('sipgn_nominatif_selected', JSON.stringify([...nominatifSelected])); } catch (e) { /* ignore */ }
     }
     function toast(msg) {
         const t = document.createElement('div');
@@ -1882,7 +1901,8 @@
     function newDraft() {
         return {
             id: uid(), tanggalTransaksi: todayStr(), tanggalDiterima: todayStr(),
-            pemasokId: '', items: [], status: 'draft', akunKas: '1000', buktiUploaded: false
+            pemasokId: '', items: [], status: 'draft', akunKas: '1000', buktiUploaded: false,
+            biayaAdmin: 0
         };
     }
     function renderSipgn() {
@@ -1978,8 +1998,14 @@
       </tr>`).join('')}
     </tbody></table>
     <button class="btn btn-outline btn-sm" style="margin-top:8px;" onclick="addItem()">+ Tambah Barang</button>
-    <div class="flexend" style="margin-top:10px;font-weight:800;color:var(--navy);">Total Harga: <span id="grandTotal">${rupiah(total)}</span></div>
-    <div class="note">Tanggal Transaksi harus sama dengan Tanggal Diterima.</div>
+    <div class="field" style="margin-top:10px;max-width:280px;margin-left:auto;">
+      <label>Biaya Admin Bank/Layanan (opsional)</label>
+      <input id="pb_biayaAdmin" type="number" min="0" value="${d.biayaAdmin || 0}" oninput="updBiayaAdmin(this.value)">
+    </div>
+    <div class="flexend" style="margin-top:6px;">Subtotal Barang: <span id="grandTotal">${rupiah(total)}</span></div>
+    <div class="flexend">Biaya Admin Bank/Layanan: <span id="biayaAdminDisplay">${rupiah(d.biayaAdmin || 0)}</span></div>
+    <div class="flexend" style="margin-top:6px;font-weight:800;color:var(--navy);">Grand Total: <span id="pbGrandTotal">${rupiah(total + (d.biayaAdmin || 0))}</span></div>
+    <div class="note">Tanggal Transaksi harus sama dengan Tanggal Diterima. Biaya admin dicatat terpisah dari subtotal barang agar rekapitulasi bahan baku tetap akurat.</div>
     <div class="flexend" style="margin-top:12px;">
       <button class="btn btn-outline" onclick="resetDraft()">Batal</button>
       <button class="btn btn-outline" onclick="submitPembelian(false)">Simpan ke Draft</button>
@@ -2008,9 +2034,21 @@
         it.total = it.harga * it.jumlah;
         const cell = document.getElementById('itemTotal' + i);
         if (cell) cell.textContent = rupiah(it.total);
-        const grand = draftPembelian.items.reduce((s, x) => s + x.total, 0);
+        refreshPembelianTotals();
+    }
+    function updBiayaAdmin(value) {
+        if (!draftPembelian) return;
+        draftPembelian.biayaAdmin = Math.max(0, Number(value) || 0);
+        const display = document.getElementById('biayaAdminDisplay');
+        if (display) display.textContent = rupiah(draftPembelian.biayaAdmin);
+        refreshPembelianTotals();
+    }
+    function refreshPembelianTotals() {
+        const subtotal = draftPembelian.items.reduce((s, x) => s + x.total, 0);
         const gt = document.getElementById('grandTotal');
-        if (gt) gt.textContent = rupiah(grand);
+        if (gt) gt.textContent = rupiah(subtotal);
+        const gtAll = document.getElementById('pbGrandTotal');
+        if (gtAll) gtAll.textContent = rupiah(subtotal + (draftPembelian.biayaAdmin || 0));
     }
     function captureDraftHeader() {
         if (!draftPembelian) return;
@@ -2018,6 +2056,7 @@
         draftPembelian.tanggalDiterima = val('pb_tglTerima') || draftPembelian.tanggalDiterima;
         draftPembelian.pemasokId = document.getElementById('pb_pemasok') ? document.getElementById('pb_pemasok').value : draftPembelian.pemasokId;
         draftPembelian.akunKas = document.getElementById('pb_akunKas') ? document.getElementById('pb_akunKas').value : draftPembelian.akunKas;
+        draftPembelian.biayaAdmin = document.getElementById('pb_biayaAdmin') ? (Number(document.getElementById('pb_biayaAdmin').value) || 0) : (draftPembelian.biayaAdmin || 0);
     }
     function resetDraft() { draftPembelian = null; editingPembelianId = null; render(); }
 
@@ -2049,6 +2088,16 @@
                 sumber: 'sipgn', approvalStatus: needApp ? 'pending' : 'approved'
             });
             if (needApp) addApproval('pembelian', { linkedTransaksiId: trxId, deskripsi: 'Pembelian dari ' + (pm ? pm.nama : '-'), jumlah: total });
+            const biayaAdmin = d.biayaAdmin || 0;
+            if (biayaAdmin > 0) {
+                DB.transaksi.push({
+                    id: uid(), tanggal: d.tanggalTransaksi, noBukti: 'SIPGN-ADM-' + d.id.slice(-6),
+                    uraian: 'Biaya Admin Bank/Layanan - ' + (pm ? pm.nama : '-'),
+                    akunKas: d.akunKas, akunLawan: '2195', tipe: 'K', jumlah: biayaAdmin,
+                    keterangan: 'Biaya transaksi perbankan/layanan pembayaran terkait pembelian ' + (pm ? pm.nama : '-'),
+                    sumber: 'sipgn', approvalStatus: 'approved'
+                });
+            }
             save('transaksi');
         }
         save('pembelian');
@@ -2061,13 +2110,16 @@
     function buildRingkasan(d) {
         const pm = DB.pemasok.find(p => p.id === d.pemasokId);
         const total = d.items.reduce((s, i) => s + i.total, 0);
+        const biayaAdmin = d.biayaAdmin || 0;
         return `<div class="card">
     <h2>Siap disalin ke SIPGN → Pembelian Langsung</h2>
     <div class="copybox">Tanggal Transaksi : ${fmtDate(d.tanggalTransaksi)}
 Tanggal Diterima  : ${fmtDate(d.tanggalDiterima)}
 Nama Pemasok      : ${pm ? pm.nama : '-'}${pm && pm.kontak ? ' (' + pm.kontak + ')' : ''}
 ${d.items.map(i => `- ${i.namaBarang} | Kategori: ${i.kategori || '-'} | Harga: ${rupiah(i.harga)} | Jumlah: ${i.jumlah} ${i.satuan} | Total: ${rupiah(i.total)}`).join('\n')}
-Total Harga       : ${rupiah(total)}</div>
+Subtotal Barang   : ${rupiah(total)}${biayaAdmin > 0 ? `
+Biaya Admin Bank/Layanan : ${rupiah(biayaAdmin)}
+Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
   </div>`;
     }
     function viewPembelian(id) {
@@ -2141,9 +2193,13 @@ Total Harga       : ${rupiah(total)}</div>
 
     // ---------- PAJAK & UPAH ----------
     function renderPajak() {
-        const rows = DB.nominatif.slice().reverse();
         const totalSemua = DB.nominatif.reduce((s, n) => s + n.grandTotal, 0);
+        const rows = DB.nominatif.slice().reverse()
+            .filter(n => nominatifFilterDept === 'Semua' || n.departemen === nominatifFilterDept);
         const jenisOpt = JENIS_PEKERJAAN.map((j, i) => `<option value="${i}">${j.label} (${rupiah(j.tarif)}/hari)</option>`).join('');
+        const deptOpt = DEPARTEMEN_LIST.map(d => `<option value="${d}">${d}</option>`).join('');
+        const deptFilterOpt = ['Semua'].concat(DEPARTEMEN_LIST).map(d => `<option value="${d}" ${d === nominatifFilterDept ? 'selected' : ''}>${d}</option>`).join('');
+        const allFilteredSelected = rows.length > 0 && rows.every(n => nominatifSelected.has(n.id));
         return `
   <div class="card">
     <h2>Nominatif Upah Sukarelawan</h2>
@@ -2155,20 +2211,36 @@ Total Harga       : ${rupiah(total)}</div>
       <div class="field"><label>Jumlah Hari Kerja</label><input id="n_hari" type="number" value="1"></div>
     </div>
     <div class="grid c3">
+      <div class="field"><label>Departemen</label><select id="n_departemen">${deptOpt}</select></div>
       <div class="field"><label><input type="checkbox" id="n_bpjsKes" style="width:auto;display:inline-block;margin-right:6px;">BPJS Kesehatan (${rupiah(68000)})</label></div>
       <div class="field"><label><input type="checkbox" id="n_bpjsTK" style="width:auto;display:inline-block;margin-right:6px;">BPJS Ketenagakerjaan (${rupiah(125000)})</label></div>
+    </div>
+    <div class="grid c3">
       <div class="field"><label><input type="checkbox" id="n_honorPJ" style="width:auto;display:inline-block;margin-right:6px;">Honorarium PJ (${rupiah(50000)})</label></div>
     </div>
     <button class="btn btn-primary" onclick="addNominatif()">Tambah ke Daftar Nominatif</button>
     <hr class="sep">
-    ${rows.length === 0 ? '<div class="empty">Belum ada data nominatif.</div>' : `
-    <div class="flexend"><button class="btn btn-outline btn-sm" onclick="exportNominatif()">Unduh CSV</button></div>
-    <table><thead><tr><th>Nama</th><th>Pekerjaan</th><th class="right">Hari</th><th class="right">Upah</th><th class="right">BPJS</th><th class="right">Honor PJ</th><th class="right">Total</th><th></th></tr></thead>
-    <tbody>${rows.map(n => `<tr><td>${n.nama}</td><td>${n.pekerjaan}</td><td class="right">${n.hari}</td>
+    ${DB.nominatif.length === 0 ? '<div class="empty">Belum ada data nominatif.</div>' : `
+    <div class="flexend" style="justify-content:space-between;align-items:center;">
+      <div class="field" style="margin-bottom:0;min-width:200px;"><label>Filter Departemen</label><select id="n_filterDept" onchange="filterNominatifDept(this.value)">${deptFilterOpt}</select></div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-outline btn-sm" onclick="exportNominatif()">Unduh CSV</button>
+        <button class="btn btn-gold btn-sm" ${nominatifSelected.size === 0 || nominatifExportBusy ? 'disabled' : ''} onclick="downloadBukuOtomatis()">
+          ${nominatifExportBusy ? 'Membuat Workbook…' : `Unduh Buku Otomatis (${nominatifSelected.size} terpilih)`}
+        </button>
+      </div>
+    </div>
+    ${rows.length === 0 ? '<div class="empty">Tidak ada data untuk departemen ini.</div>' : `
+    <table><thead><tr>
+      <th class="center"><input type="checkbox" ${allFilteredSelected ? 'checked' : ''} onchange="toggleNominatifSelectAll(this.checked)"></th>
+      <th>Nama</th><th>Departemen</th><th>Pekerjaan</th><th class="right">Hari</th><th class="right">Upah</th><th class="right">BPJS</th><th class="right">Honor PJ</th><th class="right">Total</th><th></th></tr></thead>
+    <tbody>${rows.map(n => `<tr>
+      <td class="center"><input type="checkbox" ${nominatifSelected.has(n.id) ? 'checked' : ''} onchange="toggleNominatifSelect('${n.id}')"></td>
+      <td>${n.nama}</td><td>${n.departemen || '-'}</td><td>${n.pekerjaan}</td><td class="right">${n.hari}</td>
       <td class="right">${rupiah(n.upah)}</td><td class="right">${rupiah(n.bpjs)}</td><td class="right">${rupiah(n.honorPJ)}</td>
       <td class="right"><b>${rupiah(n.grandTotal)}</b></td>
       <td><button class="link-btn" onclick="delNominatif('${n.id}')">hapus</button></td></tr>`).join('')}
-    </tbody></table>
+    </tbody></table>`}
     <div class="flexend" style="margin-top:10px;font-weight:800;color:var(--navy);">Total Semua: ${rupiah(totalSemua)}</div>`}
   </div>
 
@@ -2199,23 +2271,71 @@ Total Harga       : ${rupiah(total)}</div>
         const idx = Number(val('n_jenis')) || 0;
         const tarif = Number(val('n_tarif')) || 0;
         const hari = Number(val('n_hari')) || 0;
+        const departemen = val('n_departemen') || DEPARTEMEN_LIST[0];
         const upah = tarif * hari;
         let bpjs = 0;
         if (document.getElementById('n_bpjsKes').checked) bpjs += 68000;
         if (document.getElementById('n_bpjsTK').checked) bpjs += 125000;
         const honorPJ = document.getElementById('n_honorPJ').checked ? 50000 : 0;
         const grandTotal = upah + bpjs + honorPJ;
-        DB.nominatif.push({ id: uid(), nama, pekerjaan: JENIS_PEKERJAAN[idx].label, hari, tarif, upah, bpjs, honorPJ, grandTotal });
+        DB.nominatif.push({ id: uid(), nama, pekerjaan: JENIS_PEKERJAAN[idx].label, departemen, hari, tarif, upah, bpjs, honorPJ, grandTotal });
         save('nominatif'); render();
         toast('Ditambahkan ke daftar nominatif');
     }
     function delNominatif(id) {
         DB.nominatif = DB.nominatif.filter(n => n.id !== id);
+        if (nominatifSelected.delete(id)) saveNominatifSelection();
         save('nominatif'); render();
     }
     function exportNominatif() {
-        const rows = DB.nominatif.map(n => [n.nama, n.pekerjaan, n.hari, n.tarif, n.upah, n.bpjs, n.honorPJ, n.grandTotal]);
-        downloadCSV('Daftar_Nominatif_Upah.csv', ['Nama', 'Pekerjaan', 'Hari', 'Tarif', 'Upah', 'BPJS', 'Honor PJ', 'Total'], rows);
+        const rows = DB.nominatif.map(n => [n.nama, n.departemen || '', n.pekerjaan, n.hari, n.tarif, n.upah, n.bpjs, n.honorPJ, n.grandTotal]);
+        downloadCSV('Daftar_Nominatif_Upah.csv', ['Nama', 'Departemen', 'Pekerjaan', 'Hari', 'Tarif', 'Upah', 'BPJS', 'Honor PJ', 'Total'], rows);
+    }
+    function filterNominatifDept(value) {
+        nominatifFilterDept = value;
+        render();
+    }
+    function toggleNominatifSelect(id) {
+        if (nominatifSelected.has(id)) nominatifSelected.delete(id);
+        else nominatifSelected.add(id);
+        saveNominatifSelection();
+        render();
+    }
+    function toggleNominatifSelectAll(checked) {
+        const visible = DB.nominatif.filter(n => nominatifFilterDept === 'Semua' || n.departemen === nominatifFilterDept);
+        visible.forEach(n => {
+            if (checked) nominatifSelected.add(n.id);
+            else nominatifSelected.delete(n.id);
+        });
+        saveNominatifSelection();
+        render();
+    }
+    async function downloadBukuOtomatis() {
+        const workers = DB.nominatif.filter(n => nominatifSelected.has(n.id));
+        if (workers.length === 0) { toast('Pilih minimal satu personel dulu'); return; }
+        nominatifExportBusy = true; render();
+        try {
+            const res = await fetch('/api/report/generate-workbook', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ workers }),
+                signal: AbortSignal.timeout(30000)
+            });
+            if (!res.ok) {
+                const body = await res.json().catch(() => null);
+                throw new Error(body?.message || 'Gagal membuat workbook');
+            }
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'Buku_Otomatis_Nominatif.xlsx'; a.click();
+            URL.revokeObjectURL(url);
+            toast(`Workbook untuk ${workers.length} personel berhasil diunduh`);
+        } catch (error) {
+            toast(error.message || 'Koneksi ke server gagal, workbook tidak dapat dibuat');
+        } finally {
+            nominatifExportBusy = false; render();
+        }
     }
     function calcPPN() {
         const dpp = Number(val('ppn_dpp')) || 0;
