@@ -1015,7 +1015,7 @@
     let nominatifFilterDept = 'Semua';
     let nominatifSelected = new Set();
     let nominatifExportBusy = false;
-    let ledgerExportBusy = false;
+    let slipExportId = null;
 
     // ---------- storage helpers (per-user rows in Supabase, isolated by RLS) ----------
     async function loadAll() {
@@ -2376,31 +2376,51 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
         saveNominatifSelection();
         render();
     }
+    // Both exports hit the same MASTER_4-based generator; they differ only in how
+    // many workers are sent and what the resulting file is called.
+    async function requestWorkbook(workers, filename) {
+        const res = await fetch('/api/report/generate-workbook', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ workers, filename }),
+            signal: AbortSignal.timeout(30000)
+        });
+        if (!res.ok) {
+            const body = await res.json().catch(() => null);
+            throw new Error(body?.message || 'Gagal membuat workbook');
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = filename; a.click();
+        URL.revokeObjectURL(url);
+    }
     async function downloadBukuOtomatis() {
         const workers = DB.nominatif.filter(n => nominatifSelected.has(n.id));
         if (workers.length === 0) { toast('Pilih minimal satu personel dulu'); return; }
         nominatifExportBusy = true; render();
         try {
-            const res = await fetch('/api/report/generate-workbook', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ workers }),
-                signal: AbortSignal.timeout(30000)
-            });
-            if (!res.ok) {
-                const body = await res.json().catch(() => null);
-                throw new Error(body?.message || 'Gagal membuat workbook');
-            }
-            const blob = await res.blob();
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url; a.download = 'Buku_Otomatis_Nominatif.xlsx'; a.click();
-            URL.revokeObjectURL(url);
+            await requestWorkbook(workers, 'Buku_Otomatis_Nominatif.xlsx');
             toast(`Workbook untuk ${workers.length} personel berhasil diunduh`);
         } catch (error) {
             toast(error.message || 'Koneksi ke server gagal, workbook tidak dapat dibuat');
         } finally {
             nominatifExportBusy = false; render();
+        }
+    }
+    async function downloadSlipGaji(id) {
+        if (slipExportId) return;
+        const worker = DB.nominatif.find(n => n.id === id);
+        if (!worker) { toast('Data personel tidak ditemukan'); return; }
+        slipExportId = id; render();
+        try {
+            const safeName = worker.nama.replace(/[^\w-]+/g, '_').slice(0, 40) || 'Personel';
+            await requestWorkbook([worker], `Slip_Gaji_${safeName}.xlsx`);
+            toast(`Slip gaji ${worker.nama} berhasil diunduh`);
+        } catch (error) {
+            toast(error.message || 'Koneksi ke server gagal, slip tidak dapat dibuat');
+        } finally {
+            slipExportId = null; render();
         }
     }
     function calcPPN() {
@@ -2447,8 +2467,8 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
     <h2>Buku Kas &amp; Pembantu</h2>
     <div class="note blue">Hanya transaksi yang sudah disetujui yang dihitung.</div>
     <div class="flexend" style="margin-bottom:14px;">
-      <button class="btn btn-gold" ${ledgerExportBusy ? 'disabled' : ''} onclick="downloadLedgerWorkbook()">
-        ${ledgerExportBusy ? 'Membuat Workbook…' : 'Unduh Master (dalam format xlsx)'}
+      <button class="btn btn-gold" ${nominatifSelected.size === 0 || nominatifExportBusy ? 'disabled' : ''} onclick="downloadBukuOtomatis()">
+        ${nominatifExportBusy ? 'Membuat Workbook…' : `Unduh Buku Otomatis (${nominatifSelected.size} terpilih)`}
       </button>
     </div>
     <div class="subtabs">${subs.map(s => `<button class="subtab ${s.id === bukuSubtab ? 'active' : ''}" onclick="setBukuSub('${s.id}')">${s.label}</button>`).join('')}</div>
@@ -2465,96 +2485,22 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
         return `
     <div class="card">
       <h2>Ekspor Slip Nominatif per Personel</h2>
-      <p class="sub">Centang personel yang mau dimasukkan, lalu unduh — tiap personel jadi 1 sheet dalam satu workbook Excel.</p>
+      <p class="sub">Centang personel untuk disertakan di Buku Otomatis di bawah, atau unduh slip gaji satu orang lewat tombol di tiap baris.</p>
       ${DB.nominatif.length === 0 ? '<div class="empty">Belum ada data nominatif. Tambahkan dulu di menu Pajak &amp; Upah.</div>' : `
-      <div class="flexend" style="justify-content:space-between;align-items:center;">
-        <div class="field" style="margin-bottom:0;min-width:200px;"><label>Filter Departemen</label><select id="n_filterDept" onchange="filterNominatifDept(this.value)">${deptFilterOpt}</select></div>
-        <button class="btn btn-gold btn-sm" ${nominatifSelected.size === 0 || nominatifExportBusy ? 'disabled' : ''} onclick="downloadBukuOtomatis()">
-          ${nominatifExportBusy ? 'Membuat Workbook…' : `Unduh Buku Otomatis (${nominatifSelected.size} terpilih)`}
-        </button>
-      </div>
+      <div class="field" style="max-width:260px;"><label>Filter Departemen</label><select id="n_filterDept" onchange="filterNominatifDept(this.value)">${deptFilterOpt}</select></div>
       ${rows.length === 0 ? '<div class="empty">Tidak ada data untuk departemen ini.</div>' : `
       <table><thead><tr>
         <th class="center"><input type="checkbox" ${allFilteredSelected ? 'checked' : ''} onchange="toggleNominatifSelectAll(this.checked)"></th>
-        <th>Nama</th><th>Departemen</th><th>Pekerjaan</th><th class="right">Hari</th><th class="right">Total</th></tr></thead>
+        <th>Nama</th><th>Departemen</th><th>Pekerjaan</th><th class="right">Hari</th><th class="right">Total</th><th></th></tr></thead>
       <tbody>${rows.map(n => `<tr>
         <td class="center"><input type="checkbox" ${nominatifSelected.has(n.id) ? 'checked' : ''} onchange="toggleNominatifSelect('${n.id}')"></td>
         <td>${n.nama}</td><td>${n.departemen || '-'}</td><td>${n.pekerjaan}</td><td class="right">${n.hari}</td>
-        <td class="right"><b>${rupiah(n.grandTotal)}</b></td></tr>`).join('')}
+        <td class="right"><b>${rupiah(n.grandTotal)}</b></td>
+        <td class="right"><button class="btn btn-outline btn-sm" ${slipExportId ? 'disabled' : ''} onclick="downloadSlipGaji('${n.id}')">
+          ${slipExportId === n.id ? 'Membuat…' : 'Unduh Slip Gaji'}
+        </button></td></tr>`).join('')}
       </tbody></table>`}`}
     </div>`;
-    }
-    function buildLedgerSheets() {
-        const bkuHeaders = ['Tanggal', 'No Bukti', 'Uraian', 'Debit', 'Kredit', 'Saldo'];
-        const sheets = [{
-            name: 'BKU',
-            headers: bkuHeaders,
-            rows: ledgerAllKas().map(r => [fmtDate(r.tanggal), r.noBukti || '-', r.uraian, r.d || 0, r.k || 0, r.saldo]),
-        }];
-
-        DB.coa.filter(c => c.kategori === 'Kas').forEach(ka => {
-            sheets.push({
-                name: `BP Kas - ${ka.nama}`,
-                headers: bkuHeaders,
-                rows: ledgerForKas(ka.kode).map(r => [fmtDate(r.tanggal), r.noBukti || '-', r.uraian, r.d || 0, r.k || 0, r.saldo]),
-            });
-        });
-
-        const bpHeaders = ['Tanggal', 'Uraian', 'Dana Masuk', 'Biaya', 'Saldo'];
-        [
-            { kodeMasuk: '2000', kodeBiaya: '2010', label: 'BP Bahan Baku' },
-            { kodeMasuk: '2100', kodeBiaya: '2110', label: 'BP Operasional' },
-            { kodeMasuk: '2150', kodeBiaya: '2160', label: 'BP Fasilitas' },
-        ].forEach(({ kodeMasuk, kodeBiaya, label }) => {
-            sheets.push({
-                name: label,
-                headers: bpHeaders,
-                rows: ledgerBP(kodeMasuk, kodeBiaya).map(r => [fmtDate(r.tanggal), r.uraian, r.masuk || 0, r.keluar || 0, r.saldo]),
-            });
-        });
-
-        const kodePajak = DB.coa.filter(c => c.kategori === 'Pajak').map(c => c.kode);
-        sheets.push({
-            name: 'BP Pajak',
-            headers: ['Tanggal', 'Jenis Pajak', 'Uraian', 'Jumlah'],
-            rows: sortedTransaksi().filter(t => kodePajak.includes(t.akunLawan))
-                .map(r => [fmtDate(r.tanggal), coaByKode(r.akunLawan)?.nama || '-', r.uraian, r.jumlah]),
-        });
-
-        sheets.push({
-            name: 'Catatan Pengeluaran',
-            headers: ['Tanggal', 'Uraian', 'Kategori', 'Jumlah'],
-            rows: sortedTransaksi().filter(t => t.tipe === 'K')
-                .map(r => [fmtDate(r.tanggal), r.uraian, coaByKode(r.akunLawan)?.kategori || '-', r.jumlah]),
-        });
-
-        return sheets;
-    }
-    async function downloadLedgerWorkbook() {
-        if (ledgerExportBusy) return;
-        ledgerExportBusy = true; render();
-        try {
-            const res = await fetch('/api/report/generate-ledger-workbook', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sheets: buildLedgerSheets() }),
-                signal: AbortSignal.timeout(30000)
-            });
-            if (!res.ok) {
-                const body = await res.json().catch(() => null);
-                throw new Error(body?.message || 'Gagal membuat workbook');
-            }
-            const blob = await res.blob();
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url; a.download = 'Buku_Otomatis.xlsx'; a.click();
-            URL.revokeObjectURL(url);
-            toast('Workbook Buku Otomatis berhasil diunduh');
-        } catch (error) {
-            toast(error.message || 'Koneksi ke server gagal, workbook tidak dapat dibuat');
-        } finally {
-            ledgerExportBusy = false; render();
-        }
     }
 
     function bukuBKU() {

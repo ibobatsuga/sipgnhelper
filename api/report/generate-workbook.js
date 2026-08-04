@@ -99,6 +99,9 @@ module.exports = async function handler(req, res) {
   }
 
   const workers = req.body?.workers;
+  const filename = typeof req.body?.filename === 'string' && /^[\w.-]{1,80}$/.test(req.body.filename)
+    ? req.body.filename
+    : 'Buku_Otomatis_Nominatif.xlsx';
   if (!Array.isArray(workers) || workers.length === 0) {
     return res.status(400).json({ success: false, message: 'Pilih minimal satu personel untuk diekspor' });
   }
@@ -130,7 +133,7 @@ module.exports = async function handler(req, res) {
     const buffer = await workbook.xlsx.writeBuffer();
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename="Buku_Otomatis_Nominatif.xlsx"');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     return res.status(200).send(Buffer.from(buffer));
   } catch (error) {
     console.error('Workbook generation failed:', error instanceof Error ? error.message : error);
