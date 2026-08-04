@@ -1,17 +1,12 @@
-import { Request, Response } from 'express';
-
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 const DEFAULT_MODEL = 'gemini-3.5-flash';
 
-type ReceiptItem = { nama: string; jumlah: number; harga: number };
-type Receipt = { tanggal: string; vendor: string; items: ReceiptItem[]; total: number };
-
-const receiptPrompt = (today: string) =>
+const receiptPrompt = (today) =>
   `Ekstrak data dari foto struk/nota belanja ini. Balas HANYA dengan json valid, tanpa teks lain, tanpa markdown, format persis: {"tanggal":"YYYY-MM-DD","vendor":"nama toko","items":[{"nama":"nama barang","jumlah":1,"harga":0}],"total":0}. Jika tanggal tidak jelas terbaca, gunakan tanggal hari ini (${today}). Angka harga/total tanpa titik/koma pemisah ribuan.`;
 
-const stripCodeFence = (value: string) => value.replace(/^```(?:json)?\s*|\s*```$/gi, '').trim();
+const stripCodeFence = (value) => value.replace(/^```(?:json)?\s*|\s*```$/gi, '').trim();
 
-const parseFirstJsonObject = (value: string): unknown => {
+const parseFirstJsonObject = (value) => {
   const clean = stripCodeFence(value);
   let start = -1;
   let depth = 0;
@@ -38,44 +33,44 @@ const parseFirstJsonObject = (value: string): unknown => {
   }
   throw new Error('Incomplete JSON object in Gemini response');
 };
+const isNonNegativeNumber = (value) => typeof value === 'number' && Number.isFinite(value) && value >= 0;
 
-const isNonNegativeNumber = (value: unknown): value is number =>
-  typeof value === 'number' && Number.isFinite(value) && value >= 0;
-
-const isReceipt = (value: unknown): value is Receipt => {
+const isReceipt = (value) => {
   if (!value || typeof value !== 'object') return false;
-  const receipt = value as Partial<Receipt>;
-  return typeof receipt.tanggal === 'string'
-    && /^\d{4}-\d{2}-\d{2}$/.test(receipt.tanggal)
-    && typeof receipt.vendor === 'string'
-    && receipt.vendor.trim().length > 0
-    && Array.isArray(receipt.items)
-    && receipt.items.length <= 200
-    && receipt.items.every((item) => item
+  return typeof value.tanggal === 'string'
+    && /^\d{4}-\d{2}-\d{2}$/.test(value.tanggal)
+    && typeof value.vendor === 'string'
+    && value.vendor.trim().length > 0
+    && Array.isArray(value.items)
+    && value.items.length <= 200
+    && value.items.every((item) => item
       && typeof item.nama === 'string'
       && item.nama.trim().length > 0
       && isNonNegativeNumber(item.jumlah)
       && isNonNegativeNumber(item.harga))
-    && isNonNegativeNumber(receipt.total);
+    && isNonNegativeNumber(value.total);
 };
 
-export const extractReceipt = async (req: Request, res: Response) => {
-  const { imageBase64 } = req.body as { imageBase64?: unknown };
+module.exports = async function handler(req, res) {
+  res.setHeader('Cache-Control', 'no-store');
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', 'POST');
+    return res.status(405).json({ success: false, message: 'Method not allowed' });
+  }
+
+  const imageBase64 = req.body?.imageBase64;
   if (typeof imageBase64 !== 'string' || !/^[A-Za-z0-9+/]+={0,2}$/.test(imageBase64)) {
-    res.status(400).json({ success: false, message: 'Foto struk tidak valid' });
-    return;
+    return res.status(400).json({ success: false, message: 'Foto struk tidak valid' });
   }
 
   const imageBytes = Buffer.byteLength(imageBase64, 'base64');
   if (imageBytes === 0 || imageBytes > MAX_IMAGE_BYTES) {
-    res.status(413).json({ success: false, message: 'Ukuran foto maksimal 5 MB' });
-    return;
+    return res.status(413).json({ success: false, message: 'Ukuran foto maksimal 3 MB' });
   }
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    res.status(503).json({ success: false, message: 'Layanan pembaca struk belum dikonfigurasi' });
-    return;
+    return res.status(503).json({ success: false, message: 'Layanan pembaca struk belum dikonfigurasi' });
   }
 
   try {
@@ -100,36 +95,32 @@ export const extractReceipt = async (req: Request, res: Response) => {
           maxOutputTokens: 2048,
         },
       }),
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(25_000),
     });
 
     if (!upstream.ok) {
       const status = upstream.status === 429 ? 429 : 502;
-      res.status(status).json({
-        success: false,
-        message: upstream.status === 429
-          ? 'Layanan pembaca struk sedang mencapai batas permintaan. Coba lagi sebentar.'
-          : 'Layanan pembaca struk tidak dapat memproses permintaan saat ini',
-      });
-      return;
+      const message = upstream.status === 429
+        ? 'Layanan pembaca struk sedang mencapai batas permintaan. Coba lagi sebentar.'
+        : 'Layanan pembaca struk tidak dapat memproses permintaan saat ini';
+      return res.status(status).json({ success: false, message });
     }
 
-    const body = await upstream.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
+    const body = await upstream.json();
     const text = body.candidates?.[0]?.content?.parts?.find((part) => typeof part.text === 'string')?.text;
-    if (!text) throw new Error('Missing text content in provider response');
+    if (!text) throw new Error('Missing text content in Gemini response');
 
     const receipt = parseFirstJsonObject(text);
     if (!isReceipt(receipt)) {
-      res.status(422).json({ success: false, message: 'Data pada struk tidak dapat dibaca dengan lengkap' });
-      return;
+      return res.status(422).json({ success: false, message: 'Data pada struk tidak dapat dibaca dengan lengkap' });
     }
 
-    res.json({ success: true, data: receipt });
+    return res.status(200).json({ success: true, data: receipt });
   } catch (error) {
-    console.error('Receipt extraction failed:', error instanceof Error ? error.message : error);
+    console.error('Vercel receipt extraction failed:', error instanceof Error ? error.message : error);
     const message = error instanceof Error && error.name === 'TimeoutError'
       ? 'Waktu pembacaan struk habis. Coba lagi.'
       : 'Layanan pembaca struk mengalami gangguan';
-    res.status(502).json({ success: false, message });
+    return res.status(502).json({ success: false, message });
   }
 };
