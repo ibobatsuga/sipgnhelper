@@ -79,12 +79,18 @@ test('slip export keeps one sheet per personel', async () => {
   assert.equal(cellValue(sheet, 'S7'), '=O7+P7+Q7+R7');
 });
 
-test('book export carries every book of Bab 9', async () => {
+test('the export carries every sheet the MASTER_4 menu offers, in menu order', async () => {
   const workbook = await okWorkbook(bukuPayload());
   assert.deepEqual(workbook.worksheets.map((s) => s.name), [
+    // Menu Input
+    'Setup', 'Saldo Buku', 'Anggaran', 'Transaksi',
+    // Cetak Buku
     'BKU', 'BP Kas di Bank', 'BP Kas Kecil (Petty Cash)',
-    'BP Bahan Baku', 'BP Operasional', 'BP Fasilitas',
-    'BP Pajak PPN', 'Catatan', 'DafNom',
+    'BP Bahan Baku', 'BP Operasional', 'BP Fasilitas', 'BP Pajak PPN',
+    // Cetak Laporan
+    'LPA', 'SPTJ', 'BAPSD', 'Catatan', 'DafNom',
+    // Barang Persediaan
+    'Ref_Brg', 'Saldo_Brg', 'Masuk', 'Keluar', 'Stock_Brg (D)', 'Stock_Brg (R)',
   ]);
 });
 
@@ -103,21 +109,33 @@ test('books carry the MASTER_4 titles, identity block and period', async () => {
   assert.equal(workbook.getWorksheet('Catatan').getCell('C5').value, 'CATATAN PENGELUARAN HARIAN');
 });
 
-test('no cross-sheet formula from the master survives the clone', async () => {
+test('every formula that survives the clone still resolves inside the export', async () => {
   const workbook = await okWorkbook(bukuPayload());
+  const present = new Set(workbook.worksheets.map((s) => s.name));
   const offenders = [];
+  let kept = 0;
   workbook.eachSheet((sheet) => {
     sheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
       row.eachCell({ includeEmpty: false }, (cell, col) => {
         const formula = cell.formula || (cell.value && cell.value.sharedFormula);
         if (!formula) return;
-        if (/Transaksi!|Setup!|'Saldo Buku'!|LR!|#REF!|INDIRECT/.test(formula)) {
-          offenders.push(`${sheet.name}!${row.getCell(col).address}=${formula}`);
+        kept += 1;
+        const where = `${sheet.name}!${row.getCell(col).address}=${formula}`;
+        // A structured-table or broken reference cannot be rebuilt by ExcelJS.
+        if (/#REF!|\[/.test(formula)) offenders.push(where);
+        // INDIRECT rebuilds a reference from text the export no longer carries.
+        if (/INDIRECT/.test(formula)) offenders.push(where);
+        for (const match of formula.matchAll(/(?:'([^']+)'|([A-Za-z0-9_]+))!/g)) {
+          const named = (match[1] || match[2]).trim();
+          if (!present.has(named)) offenders.push(`${where} -> missing sheet '${named}'`);
         }
       });
     });
   });
   assert.deepEqual(offenders, []);
+  // The Barang Persediaan chain alone is thousands of formulas; a collapse to a
+  // handful would mean the clone quietly stopped carrying them.
+  assert.ok(kept > 3000, `only ${kept} formulas survived`);
 });
 
 test('BKU opens on its saldo awal and chains the running balance', async () => {

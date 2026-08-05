@@ -172,6 +172,82 @@ const copyRowStyle = (templateSheet, targetSheet, templateRowNumber, targetRowNu
   return targetRow;
 };
 
+// ---------------------------------------------------------------------------
+// Whole-sheet cloning for the form sheets (Setup, Transaksi, the letters and the
+// Barang Persediaan group).
+//
+// Unlike the book sheets, these keep the master's formulas wherever they still
+// resolve. A formula survives only when every sheet it names is also in the
+// generated workbook — the Barang Persediaan sheets reference each other, so
+// exporting the group intact keeps its stock arithmetic live. Anything pointing
+// at a sheet left behind, at a structured table (ExcelJS cannot recreate the
+// table definitions), or at a broken reference is dropped so Excel never opens
+// on a #REF!.
+// ---------------------------------------------------------------------------
+// Excel requires quotes around any sheet name that is not a bare identifier, so
+// an unquoted reference can only be [A-Za-z0-9_]. Letting spaces or brackets
+// into that class makes "IF(Setup!C6" parse as a sheet named "IF(Setup", which
+// silently deletes perfectly good formulas.
+const SHEET_REF = /(?:'([^']+)'|([A-Za-z0-9_]+))!/g;
+
+const formulaIsPortable = (formula, presentSheets) => {
+  if (/#REF!|\[/.test(formula)) return false;
+  SHEET_REF.lastIndex = 0;
+  let match = SHEET_REF.exec(formula);
+  while (match) {
+    const sheet = match[1] || match[2];
+    if (!presentSheets.has(sheet.trim())) return false;
+    match = SHEET_REF.exec(formula);
+  }
+  return true;
+};
+
+const cloneSheet = (workbook, templateSheet, sheetName, options) => {
+  const { lastRow, lastCol, presentSheets = new Set(), overrides = {} } = options;
+  const sheet = workbook.addWorksheet(sheetName, {
+    properties: { tabColor: templateSheet.properties.tabColor },
+    views: templateSheet.views,
+  });
+
+  for (let col = 1; col <= lastCol; col += 1) {
+    const source = templateSheet.getColumn(col);
+    sheet.getColumn(col).width = source.width;
+    sheet.getColumn(col).hidden = source.hidden;
+  }
+
+  for (let rowNumber = 1; rowNumber <= lastRow; rowNumber += 1) {
+    const sourceRow = templateSheet.getRow(rowNumber);
+    const targetRow = sheet.getRow(rowNumber);
+    for (let col = 1; col <= lastCol; col += 1) {
+      const sourceCell = sourceRow.getCell(col);
+      const targetCell = targetRow.getCell(col);
+      targetCell.style = sourceCell.style;
+      const formula = sourceCell.formula
+        || (sourceCell.value && sourceCell.value.sharedFormula ? sourceCell.value.sharedFormula : null);
+      if (formula) {
+        // A shared formula is re-anchored by ExcelJS on read, so the master
+        // formula of the group is the one worth carrying.
+        targetCell.value = sourceCell.formula && formulaIsPortable(sourceCell.formula, presentSheets)
+          ? { formula: sourceCell.formula }
+          : null;
+      } else {
+        targetCell.value = literalValueOf(sourceCell);
+      }
+    }
+    targetRow.height = sourceRow.height;
+  }
+
+  (templateSheet.model.merges || []).forEach((range) => {
+    const rows = parseRangeRows(range);
+    if (rows && rows[1] <= lastRow && rangeLastColumn(range) <= lastCol) sheet.mergeCells(range);
+  });
+
+  Object.entries(overrides).forEach(([address, value]) => {
+    sheet.getCell(address).value = value === undefined ? null : value;
+  });
+  return sheet;
+};
+
 const setIdentity = (sheet, cells, profil) => {
   // The master writes identity as ":  " & Setup!… so the colon lines up in the
   // merged label column; the generated books keep that shape.
@@ -347,6 +423,176 @@ const buildCatatanSheet = (workbook, templateSheet, spec) => {
   return sheet;
 };
 
+const formatRupiah = (value) => `Rp${Math.round(asNumber(value)).toLocaleString('id-ID')}`;
+
+// ---------------------------------------------------------------------------
+// Menu Input — Setup, Saldo Buku, Anggaran, Transaksi
+// ---------------------------------------------------------------------------
+
+// Setup drives the identity and period text every other sheet reads, so it is
+// filled from the app rather than left as the master's example values.
+const buildSetupSheet = (workbook, templateSheet, profil, presentSheets) => cloneSheet(
+  workbook, templateSheet, 'Setup',
+  {
+    lastRow: 25,
+    lastCol: 8,
+    presentSheets,
+    overrides: {
+      C6: profil.namaSPPG, C7: profil.idSPPG, C8: profil.alamat,
+      C9: profil.kepalaSPPG, C10: profil.akuntan, C11: profil.namaYayasan,
+      C12: profil.ketuaYayasan, C13: profil.rekening, C14: profil.tahunAnggaran,
+      // The master stores the period as text so its "s.d." line reads naturally.
+      C15: profil.periodeMulaiText, C16: profil.periodeSelesaiText,
+      C17: profil.periodeBerikutnyaText, C18: profil.tanggalPelaporan,
+      C19: profil.tempatPelaporan, C20: profil.nomorLPA, C21: profil.nomorBAPSD,
+    },
+  },
+);
+
+// Saldo Buku column D is the master's yellow input block: the balance each book
+// opens the period with. Column E is its closing counterpart; only the BKU cell
+// can stay a formula, the rest come from the app.
+const SALDO_BUKU_ROWS = [
+  ['bku', 8], ['pettyCash', 10], ['kasBank', 11], ['danaBantuan', 13],
+  ['ppn', 14], ['pph21', 15], ['pph22', 16], ['pph23', 17], ['pph4', 18],
+  ['biayaBahan', 19], ['biayaOperasional', 20], ['biayaFasilitas', 21], ['biayaLain', 22],
+];
+
+const buildSaldoBukuSheet = (workbook, templateSheet, saldo, presentSheets) => {
+  const overrides = {};
+  SALDO_BUKU_ROWS.forEach(([key, row]) => {
+    overrides[`D${row}`] = asNumber(saldo.awal ? saldo.awal[key] : 0);
+    // E8 keeps the master's =BKU!I11; every other closing balance is computed here.
+    if (row !== 8) overrides[`E${row}`] = asNumber(saldo.akhir ? saldo.akhir[key] : 0);
+  });
+  return cloneSheet(workbook, templateSheet, 'Saldo Buku', { lastRow: 25, lastCol: 9, presentSheets, overrides });
+};
+
+// The master's Anggaran sheet plans MBG meal packages per day and category.
+// SIPGN Helper records budgets in rupiah only, so this ships as the blank
+// planning form it is in MASTER_4.
+const buildAnggaranSheet = (workbook, templateSheet, presentSheets) => cloneSheet(
+  workbook, templateSheet, 'Anggaran', { lastRow: 20, lastCol: 17, presentSheets },
+);
+
+// Transaksi is the master's input sheet; every book in MASTER_4 is a view over
+// it. Columns C..J are what an operator types, K..T are same-sheet formulas that
+// survive the clone, so the exported sheet behaves like the original.
+const TRANSAKSI_FIRST_ROW = 11;
+
+const buildTransaksiSheet = (workbook, templateSheet, rows, presentSheets) => {
+  const lastRow = Math.max(TRANSAKSI_FIRST_ROW + rows.length - 1, TRANSAKSI_FIRST_ROW + 9);
+  const sheet = cloneSheet(workbook, templateSheet, 'Transaksi', { lastRow, lastCol: 20, presentSheets });
+
+  rows.forEach((entry, index) => {
+    const row = sheet.getRow(TRANSAKSI_FIRST_ROW + index);
+    row.getCell('C').value = parseISODate(entry.tanggal);
+    row.getCell('E').value = asText(entry.noBukti, 40);
+    row.getCell('F').value = asText(entry.uraian);
+    row.getCell('G').value = asNumber(entry.debet) || null;
+    row.getCell('H').value = asNumber(entry.kredit) || null;
+    row.getCell('I').value = asText(entry.jenisBuku, 60) || null;
+    row.getCell('J').value = asText(entry.akunKas, 60) || null;
+    row.commit();
+  });
+  return sheet;
+};
+
+// ---------------------------------------------------------------------------
+// Cetak Laporan — LPA, SPTJ, BAPSD
+//
+// These are letters, not ledgers: they read names and dates from Setup and their
+// figures from LR, a sheet the export leaves behind. The Setup references
+// survive the clone; the LR ones are replaced with totals the app computed.
+// ---------------------------------------------------------------------------
+const sisaDana = (laporan) => asNumber(laporan.danaPemasukan)
+  - (asNumber(laporan.bahanBaku) + asNumber(laporan.operasional) + asNumber(laporan.fasilitas));
+
+const buildLpaSheet = (workbook, templateSheet, laporan, presentSheets) => cloneSheet(
+  workbook, templateSheet, 'LPA',
+  {
+    lastRow: 54,
+    lastCol: 12,
+    presentSheets,
+    overrides: {
+      F19: asNumber(laporan.danaPemasukan),
+      F21: asNumber(laporan.bahanBaku),
+      F22: asNumber(laporan.operasional),
+      F23: asNumber(laporan.fasilitas),
+      // BAPSD and the closing sentence both read the sisa from this cell.
+      AB26: sisaDana(laporan),
+      B35: `Sisa dana sebesar ${formatRupiah(sisaDana(laporan))} akan dialihkan ke periode berikutnya.`,
+    },
+  },
+);
+
+const buildSptjSheet = (workbook, templateSheet, presentSheets) => cloneSheet(
+  workbook, templateSheet, 'SPTJ', { lastRow: 35, lastCol: 12, presentSheets },
+);
+
+const buildBapsdSheet = (workbook, templateSheet, laporan, presentSheets) => cloneSheet(
+  workbook, templateSheet, 'BAPSD',
+  {
+    lastRow: 33,
+    lastCol: 10,
+    presentSheets,
+    overrides: {
+      A10: `Sisa dana sebesar ${formatRupiah(sisaDana(laporan))} akan dialihkan ke periode selanjutnya.`,
+    },
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Barang Persediaan — Ref_Brg, Saldo_Brg, Masuk, Keluar, Stock_Brg (D)/(R)
+//
+// This group is self-contained: the stock report is computed from the reference
+// list, the opening balances and the two movement sheets, all of which travel
+// together. Exporting them under their MASTER_4 names keeps that arithmetic
+// live, so whatever an operator types into Saldo_Brg or Keluar still totals up.
+// SIPGN Helper has no stock module yet, so only Penerimaan Barang carries data —
+// built from the pembelian items already recorded.
+// ---------------------------------------------------------------------------
+const REF_BRG_LAST_ROW = 315; // the catalogue itself runs to row 311
+const MASUK_ENTRY_ROW = 312; // rows 9..311 mirror Saldo_Brg; entries start here
+const KELUAR_ENTRY_ROW = 8;
+const MASUK_MIN_ROWS = 40;
+const KELUAR_FORM_ROWS = 40;
+
+const buildBarangSheets = (workbook, templateFor, barang, presentSheets) => {
+  cloneSheet(workbook, templateFor('Ref_Brg'), 'Ref_Brg', { lastRow: REF_BRG_LAST_ROW, lastCol: 6, presentSheets });
+  cloneSheet(workbook, templateFor('Saldo_Brg'), 'Saldo_Brg', { lastRow: REF_BRG_LAST_ROW, lastCol: 8, presentSheets });
+
+  const masukRows = barang.masuk || [];
+  const masuk = cloneSheet(workbook, templateFor('Masuk'), 'Masuk', {
+    lastRow: MASUK_ENTRY_ROW + Math.max(masukRows.length, MASUK_MIN_ROWS) - 1,
+    lastCol: 12,
+    presentSheets,
+  });
+  masukRows.forEach((entry, index) => {
+    const rowNumber = MASUK_ENTRY_ROW + index;
+    const row = masuk.getRow(rowNumber);
+    row.getCell('C').value = parseISODate(entry.tanggal);
+    row.getCell('D').value = asText(entry.supplier, 80) || null;
+    row.getCell('E').value = asText(entry.nama, 120) || null;
+    // The master derives satuan by VLOOKUP against Ref_Brg, which only resolves
+    // for catalogue names; a purchase carries its own, so that one wins.
+    row.getCell('G').value = asText(entry.satuan, 20) || null;
+    row.getCell('H').value = asNumber(entry.vol) || null;
+    row.getCell('I').value = asNumber(entry.harga) || null;
+    // Column J is a structured-table formula in the master and cannot survive
+    // the clone, so it is rebuilt as plain arithmetic.
+    row.getCell('J').value = { formula: `IF(H${rowNumber}="","",H${rowNumber}*I${rowNumber})` };
+    row.commit();
+  });
+
+  cloneSheet(workbook, templateFor('Keluar'), 'Keluar', {
+    lastRow: KELUAR_ENTRY_ROW + KELUAR_FORM_ROWS - 1, lastCol: 8, presentSheets,
+  });
+  // Column AA feeds the rekap's SUMIF, so the detail sheet keeps its full width.
+  cloneSheet(workbook, templateFor('Stock_Brg (D)'), 'Stock_Brg (D)', { lastRow: REF_BRG_LAST_ROW, lastCol: 28, presentSheets });
+  cloneSheet(workbook, templateFor('Stock_Brg (R)'), 'Stock_Brg (R)', { lastRow: 48, lastCol: 8, presentSheets });
+};
+
 // ---------------------------------------------------------------------------
 // DafNom
 // ---------------------------------------------------------------------------
@@ -518,11 +764,27 @@ const validateGroup = (group, label) => {
   return group;
 };
 
-const readProfil = (raw) => ({
-  namaSPPG: asText(raw && raw.namaSPPG, 120),
-  idSPPG: asText(raw && raw.idSPPG, 60),
-  alamat: asText(raw && raw.alamat, 200),
-});
+// Only the three identity fields are needed by the book headers; the rest fill
+// the Setup sheet and the three letters, and each is optional.
+const PROFIL_FIELDS = [
+  ['namaSPPG', 120], ['idSPPG', 60], ['alamat', 200], ['kepalaSPPG', 120],
+  ['akuntan', 120], ['namaYayasan', 120], ['ketuaYayasan', 120], ['rekening', 60],
+  ['tahunAnggaran', 20], ['periodeMulaiText', 40], ['periodeSelesaiText', 40],
+  ['periodeBerikutnyaText', 40], ['tanggalPelaporan', 40], ['tempatPelaporan', 60],
+  ['nomorLPA', 60], ['nomorBAPSD', 60],
+];
+
+const readProfil = (raw) => Object.fromEntries(
+  PROFIL_FIELDS.map(([field, max]) => [field, asText(raw && raw[field], max)]),
+);
+
+const isTransaksiRow = (row) => row && typeof row === 'object'
+  && parseISODate(row.tanggal) !== null
+  && isFiniteNumber(row.debet ?? 0) && isFiniteNumber(row.kredit ?? 0);
+
+const isMasukRow = (row) => row && typeof row === 'object'
+  && parseISODate(row.tanggal) !== null
+  && isFiniteNumber(row.vol ?? 0) && isFiniteNumber(row.harga ?? 0);
 
 // ---------------------------------------------------------------------------
 // Workbook assembly
@@ -535,6 +797,29 @@ const buildBukuWorkbook = (workbook, templateWorkbook, buku, profil, periodeText
     if (!sheet) throw new Error(`Sheet template '${name}' tidak ditemukan pada MASTER_4.xlsx`);
     return sheet;
   };
+
+  // Sheets that keep their MASTER_4 name, so the formulas pointing at them still
+  // resolve inside the export. A formula naming anything outside this set is
+  // dropped by cloneSheet.
+  const presentSheets = new Set([
+    'Setup', 'Saldo Buku', 'Anggaran', 'Transaksi', 'BKU',
+    'LPA', 'SPTJ', 'BAPSD', 'Catatan', 'DafNom',
+    'Ref_Brg', 'Saldo_Brg', 'Masuk', 'Keluar', 'Stock_Brg (D)', 'Stock_Brg (R)',
+  ]);
+
+  // --- Menu Input -----------------------------------------------------------
+  buildSetupSheet(workbook, templateFor('Setup'), profil, presentSheets);
+  usedNames.add('setup');
+  buildSaldoBukuSheet(workbook, templateFor('Saldo Buku'), buku.saldoBuku || {}, presentSheets);
+  usedNames.add('saldo buku');
+  buildAnggaranSheet(workbook, templateFor('Anggaran'), presentSheets);
+  usedNames.add('anggaran');
+  buildTransaksiSheet(
+    workbook, templateFor('Transaksi'),
+    validateRows(buku.transaksi || [], isTransaksiRow, 'Transaksi'),
+    presentSheets,
+  );
+  usedNames.add('transaksi');
 
   if (buku.bku) {
     buildLedgerSheet(workbook, templateFor('BKU'), {
@@ -589,6 +874,15 @@ const buildBukuWorkbook = (workbook, templateWorkbook, buku, profil, periodeText
     });
   });
 
+  // --- Cetak Laporan --------------------------------------------------------
+  const laporan = buku.laporan || {};
+  buildLpaSheet(workbook, templateFor('LPA'), laporan, presentSheets);
+  usedNames.add('lpa');
+  buildSptjSheet(workbook, templateFor('SPTJ'), presentSheets);
+  usedNames.add('sptj');
+  buildBapsdSheet(workbook, templateFor('BAPSD'), laporan, presentSheets);
+  usedNames.add('bapsd');
+
   if (buku.catatan) {
     buildCatatanSheet(workbook, templateFor('Catatan'), {
       sheetName: sheetFor('Catatan'),
@@ -602,6 +896,11 @@ const buildBukuWorkbook = (workbook, templateWorkbook, buku, profil, periodeText
   if (workers.length > 0) {
     buildDafNomSheet(workbook, templateFor(DAFNOM_SHEET_NAME), sheetFor('DafNom'), workers, dayCount, periodeLabel, true);
   }
+
+  // --- Barang Persediaan ----------------------------------------------------
+  const barang = buku.barang || {};
+  validateRows(barang.masuk || [], isMasukRow, 'Penerimaan Barang');
+  buildBarangSheets(workbook, templateFor, barang, presentSheets);
 };
 
 // The platform parses application/json for us, but a body that arrives as raw

@@ -213,7 +213,19 @@ test('selection narrows the personel list, no selection means everyone on screen
   assert.deepEqual(plain(api.bukuExportWorkers()).map((n) => n.nama), ['B'], 'an explicit tick wins over the department filter');
 });
 
-test('profil feeds the identity block the books print', () => {
+test('profil feeds the identity block and the letters', () => {
   const api = withDB({});
-  assert.deepEqual(plain(api.profilBuku()), { namaSPPG: 'SPPG Melati', idSPPG: 'SPPG-0142', alamat: 'Jl. Merdeka 10' });
+  const profil = plain(api.profilBuku(api.periodeInfo()));
+  assert.equal(profil.namaSPPG, 'SPPG Melati');
+  assert.equal(profil.idSPPG, 'SPPG-0142');
+  assert.equal(profil.alamat, 'Jl. Merdeka 10');
+  // The master stores the period as dd-mm-yyyy text and dates the next one.
+  assert.equal(profil.periodeMulaiText, '01-08-2026');
+  assert.equal(profil.periodeSelesaiText, '31-08-2026');
+  assert.equal(profil.periodeBerikutnyaText, '1 September 2026');
+  assert.equal(profil.tahunAnggaran, '2026');
+  assert.equal(profil.tanggalPelaporan, '31 Agustus 2026');
+  // Fields the operator has not filled in stay empty rather than being invented.
+  assert.equal(profil.nomorLPA, '');
+  assert.equal(profil.ketuaYayasan, '');
 });

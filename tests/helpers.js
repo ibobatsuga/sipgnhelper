@@ -132,7 +132,14 @@ const bukuPayload = (over = {}) => ({
   periodeLabel: 'Agustus 2026',
   periodeText: 'Periode : 01 Agu 2026 s.d. 31 Agu 2026',
   dayCount: 31,
-  profil: { namaSPPG: 'SPPG Melati', idSPPG: 'SPPG-0142', alamat: 'Jl. Merdeka 10' },
+  profil: {
+    namaSPPG: 'SPPG Melati', idSPPG: 'SPPG-0142', alamat: 'Jl. Merdeka 10',
+    kepalaSPPG: 'Dr. Rina', akuntan: 'Andi', namaYayasan: 'Yayasan Sejahtera',
+    ketuaYayasan: 'H. Sulaiman', rekening: '1234567890', tahunAnggaran: '2026',
+    periodeMulaiText: '01-08-2026', periodeSelesaiText: '31-08-2026',
+    periodeBerikutnyaText: '1 September 2026', tanggalPelaporan: '31 Agustus 2026',
+    tempatPelaporan: 'Bandung', nomorLPA: 'LPA/08/2026', nomorBAPSD: 'BAPSD/08/2026',
+  },
   workers: [worker({ nama: 'Siti Aminah' }), worker({ nama: 'Budi Santoso', pekerjaan: 'Distribusi', tarif: 50000, honorPJ: 50000 })],
   buku: {
     bku: { saldoAwal: 1500000, rows: [ledgerRow({ tanggal: '2026-08-01', debet: 25000000, kredit: 0 }), ledgerRow()] },
@@ -146,6 +153,18 @@ const bukuPayload = (over = {}) => ({
       { key: 'fasilitas', jenis: 'Insentif Fasilitas', rows: [] },
     ],
     pajak: [{ jenis: 'PPN', saldoAwal: 0, rows: [ledgerRow({ uraian: 'PPN', kredit: 11000 })] }],
+    transaksi: [
+      { tanggal: '2026-08-01', noBukti: 'B-0', uraian: 'Dana bahan makanan', debet: 25000000, kredit: 0, jenisBuku: 'Dana Bantuan Pemerintah', akunKas: 'Kas di Bank' },
+      { tanggal: '2026-08-02', noBukti: 'B-1', uraian: 'Belanja sayur', debet: 0, kredit: 100000, jenisBuku: 'Biaya Bahan Baku', akunKas: 'Kas di Bank' },
+    ],
+    saldoBuku: {
+      awal: { bku: 1500000, kasBank: 1500000, pettyCash: 0, danaBantuan: 1500000 },
+      akhir: { bku: 26400000, kasBank: 26400000, pettyCash: 0, danaBantuan: 26500000, biayaBahan: 100000 },
+    },
+    laporan: { danaPemasukan: 26500000, bahanBaku: 100000, operasional: 0, fasilitas: 0 },
+    barang: {
+      masuk: [{ tanggal: '2026-08-02', supplier: 'Koperasi Desa', nama: 'Beras putih (medium)', satuan: 'kg', vol: 50, harga: 12000 }],
+    },
     catatan: {
       ringkasan: { sisaLalu: 1500000, diterima: 25000000, bahanBaku: 100000, operasional: 0, fasilitas: 0 },
       rows: [{ tanggal: '2026-08-01', jumlah: 0 }, { tanggal: '2026-08-02', jumlah: 100000 }],
