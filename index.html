@@ -519,6 +519,19 @@
         transition: all 0.15s ease;
     }
 
+    /* The 40px height above is meant for text fields; without this a checkbox
+       inherits it and renders as a big empty box. */
+    input[type="checkbox"], input[type="radio"] {
+        width: 15px;
+        height: 15px;
+        min-height: 0;
+        padding: 0;
+        border-radius: 4px;
+        accent-color: #0d9488;
+        vertical-align: middle;
+        cursor: pointer;
+    }
+
     select {
         -webkit-appearance: none;
         appearance: none;
@@ -2312,9 +2325,9 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
       <div class="field"><label>Hari Kerja</label><input id="n_hari" type="number" value="1"></div>
     </div>
     <div class="grid c3">
-      <div class="field"><label><input type="checkbox" id="n_bpjsKes" style="width:auto;display:inline-block;margin-right:6px;">BPJS Kesehatan (${rupiah(68000)})</label></div>
-      <div class="field"><label><input type="checkbox" id="n_bpjsTK" style="width:auto;display:inline-block;margin-right:6px;">BPJS Ketenagakerjaan (${rupiah(125000)})</label></div>
-      <div class="field"><label><input type="checkbox" id="n_honorPJ" style="width:auto;display:inline-block;margin-right:6px;">Honorarium PJ (${rupiah(50000)})</label></div>
+      <div class="field"><label><input type="checkbox" id="n_bpjsKes" style="margin-right:6px;">BPJS Kesehatan (${rupiah(68000)})</label></div>
+      <div class="field"><label><input type="checkbox" id="n_bpjsTK" style="margin-right:6px;">BPJS Ketenagakerjaan (${rupiah(125000)})</label></div>
+      <div class="field"><label><input type="checkbox" id="n_honorPJ" style="margin-right:6px;">Honorarium PJ (${rupiah(50000)})</label></div>
     </div>
     <button class="btn btn-primary" onclick="addNominatif()">Tambah ke Daftar Nominatif</button>
     <hr class="sep">
@@ -2464,9 +2477,17 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
         a.href = url; a.download = filename; a.click();
         URL.revokeObjectURL(url);
     }
+    // Ticking personel only narrows the export. With nothing ticked the book covers
+    // everyone in the department filter that is currently shown, so downloading never
+    // requires picking a name first.
+    function bukuExportWorkers() {
+        const selected = DB.nominatif.filter(n => nominatifSelected.has(n.id));
+        if (selected.length > 0) return selected;
+        return DB.nominatif.filter(n => nominatifFilterDept === 'Semua' || n.departemen === nominatifFilterDept);
+    }
     async function downloadBukuOtomatis() {
-        const workers = DB.nominatif.filter(n => nominatifSelected.has(n.id));
-        if (workers.length === 0) { toast('Pilih minimal satu personel dulu'); return; }
+        const workers = bukuExportWorkers();
+        if (workers.length === 0) { toast('Belum ada data nominatif untuk diekspor'); return; }
         const { dayCount, label } = periodeInfo();
         nominatifExportBusy = true; render();
         try {
@@ -2479,8 +2500,8 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
         }
     }
     async function downloadBukuBiweekly() {
-        const workers = DB.nominatif.filter(n => nominatifSelected.has(n.id));
-        if (workers.length === 0) { toast('Pilih minimal satu personel dulu'); return; }
+        const workers = bukuExportWorkers();
+        if (workers.length === 0) { toast('Belum ada data nominatif untuk diekspor'); return; }
         biweeklyExportBusy = true; render();
         try {
             // 10 day columns is DafNom's native span: two blocks of five working days.
@@ -2545,6 +2566,7 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
         else if (bukuSubtab === 'bpfas') body = bukuBP('2150', '2160', 'Insentif Fasilitas');
         else if (bukuSubtab === 'bppajak') body = bukuBPPajak();
         else if (bukuSubtab === 'catatan') body = bukuCatatan();
+        const exportCount = bukuExportWorkers().length;
         return `
     ${renderNominatifSelector()}
 
@@ -2553,11 +2575,11 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
     <div class="note blue" style="margin-top:0;margin-bottom:16px;">Hanya transaksi yang sudah disetujui yang dihitung.</div>
     <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px;">
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
-        <button class="btn btn-outline" ${nominatifSelected.size === 0 || biweeklyExportBusy ? 'disabled' : ''} onclick="downloadBukuBiweekly()">
+        <button class="btn btn-outline" ${exportCount === 0 || biweeklyExportBusy ? 'disabled' : ''} onclick="downloadBukuBiweekly()">
           ${biweeklyExportBusy ? 'Membuat Workbook…' : 'Unduh Buku Biweekly (10 Hari Kerja)'}
         </button>
-        <button class="btn btn-gold" ${nominatifSelected.size === 0 || nominatifExportBusy ? 'disabled' : ''} onclick="downloadBukuOtomatis()">
-          ${nominatifExportBusy ? 'Membuat Workbook…' : `Unduh Buku Bulanan (${nominatifSelected.size} terpilih)`}
+        <button class="btn btn-gold" ${exportCount === 0 || nominatifExportBusy ? 'disabled' : ''} onclick="downloadBukuOtomatis()">
+          ${nominatifExportBusy ? 'Membuat Workbook…' : `Unduh Buku Bulanan (${exportCount} personel)`}
         </button>
       </div>
       <div class="field" style="margin-bottom:0;min-width:240px;">
@@ -2581,7 +2603,7 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
         return `
     <div class="card">
       <h2>Ekspor Slip Nominatif per Personel</h2>
-      <p class="sub">Centang personel untuk disertakan di Buku Otomatis di bawah, atau unduh slip gaji satu orang lewat tombol di tiap baris.</p>
+      <p class="sub">Tanpa centang, Buku Otomatis di bawah memuat seluruh personel sesuai filter departemen. Centang hanya bila ingin membatasi isinya, atau unduh slip gaji satu orang lewat tombol di tiap baris.</p>
       ${DB.nominatif.length === 0 ? '<div class="empty">Belum ada data nominatif. Tambahkan dulu di menu Pajak &amp; Upah.</div>' : `
       <div class="field" style="max-width:260px;"><label>Filter Departemen</label><select id="n_filterDept" onchange="filterNominatifDept(this.value)">${deptFilterOpt}</select></div>
       ${rows.length === 0 ? '<div class="empty">Tidak ada data untuk departemen ini.</div>' : `
