@@ -1000,7 +1000,8 @@
     function defaultDB() {
         return {
             setup: {
-                namaSPPG: '', idSPPG: '', namaYayasan: '', kepalaSPPG: '', akuntan: '', alamat: '', rekening: '',
+                namaSPPG: '', idSPPG: '', namaYayasan: '', ketuaYayasan: '', kepalaSPPG: '', akuntan: '', alamat: '', rekening: '',
+                tahunAnggaran: '', tempatPelaporan: '', tanggalPelaporan: '', nomorLPA: '', nomorBAPSD: '',
                 approvalThreshold: 500000, periodeMulai: '', periodeSelesai: '',
                 reviewed: false, reviewedBy: '', reviewedAt: ''
             },
@@ -1649,12 +1650,26 @@
       <div class="field"><label>Nama SPPG</label><input id="f_namaSPPG" value="${s.namaSPPG || ''}"></div>
       <div class="field"><label>ID SPPG</label><input id="f_idSPPG" value="${s.idSPPG || ''}" placeholder="Kode SPPG pada dokumen resmi"></div>
       <div class="field"><label>Nama Yayasan / Lembaga</label><input id="f_namaYayasan" value="${s.namaYayasan || ''}"></div>
+      <div class="field"><label>Ketua Yayasan / Yang Mewakili</label><input id="f_ketuaYayasan" value="${s.ketuaYayasan || ''}"></div>
       <div class="field"><label>Nama Kepala SPPG</label><input id="f_kepalaSPPG" value="${s.kepalaSPPG || ''}"></div>
       <div class="field"><label>Nama Akuntan / PLOK</label><input id="f_akuntan" value="${s.akuntan || ''}"></div>
       <div class="field"><label>Nomor Rekening / VA</label><input id="f_rekening" value="${s.rekening || ''}"></div>
       <div class="field"><label>Alamat</label><input id="f_alamat" value="${s.alamat || ''}"></div>
     </div>
     <button class="btn btn-primary" onclick="saveSetup()">Simpan Profil</button>
+  </div>
+
+  <div class="card">
+    <h2>Data Pelaporan</h2>
+    <p class="sub" style="margin-top:-4px;">Dicetak pada surat LPA, SPTJ, dan Berita Acara Sisa Dana di Buku Otomatis. Boleh dikosongkan bila belum ada nomornya.</p>
+    <div class="grid c3">
+      <div class="field"><label>Tahun Anggaran</label><input id="f_tahunAnggaran" value="${s.tahunAnggaran || ''}" placeholder="cth: 2026"></div>
+      <div class="field"><label>Tempat Pelaporan</label><input id="f_tempatPelaporan" value="${s.tempatPelaporan || ''}" placeholder="cth: Bandung"></div>
+      <div class="field"><label>Tanggal Pelaporan</label><input id="f_tanggalPelaporan" value="${s.tanggalPelaporan || ''}" placeholder="cth: 31 Agustus 2026"></div>
+      <div class="field"><label>Nomor LPA</label><input id="f_nomorLPA" value="${s.nomorLPA || ''}"></div>
+      <div class="field"><label>Nomor Berita Acara Sisa Dana</label><input id="f_nomorBAPSD" value="${s.nomorBAPSD || ''}"></div>
+    </div>
+    <button class="btn btn-primary" onclick="saveSetup()">Simpan Data Pelaporan</button>
   </div>
 
   <div class="card">
@@ -1706,6 +1721,12 @@
             ...DB.setup,
             namaSPPG: val('f_namaSPPG') || DB.setup.namaSPPG, idSPPG: val('f_idSPPG') || DB.setup.idSPPG,
             namaYayasan: val('f_namaYayasan') || DB.setup.namaYayasan,
+            ketuaYayasan: val('f_ketuaYayasan') || DB.setup.ketuaYayasan,
+            tahunAnggaran: val('f_tahunAnggaran') || DB.setup.tahunAnggaran,
+            tempatPelaporan: val('f_tempatPelaporan') || DB.setup.tempatPelaporan,
+            tanggalPelaporan: val('f_tanggalPelaporan') || DB.setup.tanggalPelaporan,
+            nomorLPA: val('f_nomorLPA') || DB.setup.nomorLPA,
+            nomorBAPSD: val('f_nomorBAPSD') || DB.setup.nomorBAPSD,
             kepalaSPPG: val('f_kepalaSPPG') || DB.setup.kepalaSPPG, akuntan: val('f_akuntan') || DB.setup.akuntan,
             rekening: val('f_rekening') || DB.setup.rekening, alamat: val('f_alamat') || DB.setup.alamat,
             approvalThreshold: document.getElementById('f_threshold') ? Number(val('f_threshold')) || 0 : DB.setup.approvalThreshold,
@@ -2616,19 +2637,71 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
             });
         }
 
+        const diterima = dalam.filter(t => t.tipe === 'D').reduce((total, t) => total + t.jumlah, 0);
+        const realisasi = {
+            bahanBaku: belanjaKode('2010').reduce((total, t) => total + t.jumlah, 0),
+            operasional: belanjaKode('2110').reduce((total, t) => total + t.jumlah, 0),
+            fasilitas: belanjaKode('2160').reduce((total, t) => total + t.jumlah, 0),
+        };
+        // Cumulative movement on one akun lawan up to a cut-off, for the opening
+        // and closing columns of Saldo Buku.
+        const kumulatif = (list, kode) => list.filter(t => t.akunLawan === kode)
+            .reduce((total, t) => total + t.jumlah, 0);
+        const sampaiAkhir = sebelum.concat(dalam);
+        const saldoPerAkun = list => ({
+            bku: saldoAwal(list),
+            pettyCash: saldoAwal(list.filter(t => t.akunKas === '1000')),
+            kasBank: saldoAwal(list.filter(t => t.akunKas === '1100')),
+            danaBantuan: list.filter(t => (coaByKode(t.akunLawan) || {}).kategori === 'Dana Masuk')
+                .reduce((total, t) => total + t.jumlah, 0),
+            ppn: kumulatif(list, '2170'), pph21: kumulatif(list, '2180'), pph22: 0, pph23: 0,
+            pph4: kumulatif(list, '2190'),
+            biayaBahan: kumulatif(list, '2010'), biayaOperasional: kumulatif(list, '2110'),
+            biayaFasilitas: kumulatif(list, '2160'), biayaLain: kumulatif(list, '2195'),
+        });
+
+        // Penerimaan Barang comes from the pembelian items already recorded; the
+        // app has no stock module, so the other Barang Persediaan sheets travel
+        // as the blank MASTER_4 forms.
+        const masukBarang = [];
+        DB.pembelian
+            .filter(p => p.tanggalTransaksi >= range.mulai && p.tanggalTransaksi <= range.selesai)
+            .forEach(p => {
+                const pemasok = DB.pemasok.find(x => x.id === p.pemasokId);
+                (p.items || []).forEach(item => {
+                    if (!item.namaBarang) return;
+                    masukBarang.push({
+                        tanggal: p.tanggalTransaksi,
+                        supplier: pemasok ? pemasok.nama : '',
+                        nama: item.namaBarang,
+                        satuan: item.satuan || '',
+                        vol: Number(item.jumlah) || 0,
+                        harga: Number(item.harga) || 0,
+                    });
+                });
+            });
+
         return {
             bku: { saldoAwal: saldoAwal(sebelum), rows: dalam.map(barisKas) },
             kas,
             belanja,
             pajak,
+            transaksi: dalam.map(t => ({
+                tanggal: t.tanggal, noBukti: t.noBukti || '', uraian: t.uraian || '',
+                debet: t.tipe === 'D' ? t.jumlah : 0, kredit: t.tipe === 'K' ? t.jumlah : 0,
+                jenisBuku: jenisBukuMaster(t.akunLawan), akunKas: akunKasMaster(t.akunKas),
+            })),
+            saldoBuku: { awal: saldoPerAkun(sebelum), akhir: saldoPerAkun(sampaiAkhir) },
+            laporan: {
+                // The master counts the previous period's closing balance as part
+                // of the funds available, matching its "termasuk saldo akhir
+                // periode yang lalu" note.
+                danaPemasukan: saldoAwal(sebelum) + diterima,
+                ...realisasi,
+            },
+            barang: { masuk: masukBarang },
             catatan: {
-                ringkasan: {
-                    sisaLalu: saldoAwal(sebelum),
-                    diterima: dalam.filter(t => t.tipe === 'D').reduce((total, t) => total + t.jumlah, 0),
-                    bahanBaku: belanjaKode('2010').reduce((total, t) => total + t.jumlah, 0),
-                    operasional: belanjaKode('2110').reduce((total, t) => total + t.jumlah, 0),
-                    fasilitas: belanjaKode('2160').reduce((total, t) => total + t.jumlah, 0),
-                },
+                ringkasan: { sisaLalu: saldoAwal(sebelum), diterima, ...realisasi },
                 rows: harian,
             },
         };
@@ -2653,9 +2726,53 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
             departemen: teks(n.departemen),
         };
     }
-    function profilBuku() {
+    // MASTER_4's Setup sheet feeds every other sheet, and the three letters (LPA,
+    // SPTJ, BAPSD) print these names and dates verbatim.
+    function profilBuku(range) {
         const s = DB.setup;
-        return { namaSPPG: s.namaSPPG || '', idSPPG: s.idSPPG || '', alamat: s.alamat || '' };
+        const akhir = range ? parseISODate(range.selesai) : null;
+        const berikutnya = akhir ? new Date(akhir.getFullYear(), akhir.getMonth(), akhir.getDate() + 1) : null;
+        const panjang = d => d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+        const teksTanggal = iso => {
+            const d = parseISODate(iso);
+            return d ? `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}` : '';
+        };
+        return {
+            namaSPPG: s.namaSPPG || '', idSPPG: s.idSPPG || '', alamat: s.alamat || '',
+            kepalaSPPG: s.kepalaSPPG || '', akuntan: s.akuntan || '',
+            namaYayasan: s.namaYayasan || '', ketuaYayasan: s.ketuaYayasan || '',
+            rekening: s.rekening || '',
+            tahunAnggaran: s.tahunAnggaran || (akhir ? String(akhir.getFullYear()) : ''),
+            periodeMulaiText: range ? teksTanggal(range.mulai) : '',
+            periodeSelesaiText: range ? teksTanggal(range.selesai) : '',
+            periodeBerikutnyaText: berikutnya ? panjang(berikutnya) : '',
+            tanggalPelaporan: s.tanggalPelaporan || (akhir ? panjang(akhir) : ''),
+            tempatPelaporan: s.tempatPelaporan || '',
+            nomorLPA: s.nomorLPA || '', nomorBAPSD: s.nomorBAPSD || '',
+        };
+    }
+    // MASTER_4's Transaksi sheet drives its books through two dropdowns whose
+    // wording is fixed by the master. The app's chart of accounts is mapped onto
+    // that vocabulary so the exported sheet behaves like a hand-typed one.
+    const JENIS_BUKU_MASTER = {
+        '2010': 'Biaya Bahan Baku', '2110': 'Biaya Operasional', '2160': 'Biaya Insentif Fasilitas',
+        '2170': 'Pungutan/Setoran PPN', '2180': 'Pungutan/Setoran PPh 21', '2190': 'Pungutan/Setoran PPh pasal 4 ayat (2)',
+    };
+    function jenisBukuMaster(kodeAkun) {
+        if (JENIS_BUKU_MASTER[kodeAkun]) return JENIS_BUKU_MASTER[kodeAkun];
+        const akun = coaByKode(kodeAkun);
+        if (!akun) return 'Biaya Lainnya';
+        if (akun.kategori === 'Dana Masuk') return 'Dana Bantuan Pemerintah';
+        if (akun.kategori === 'Biaya Bahan Baku') return 'Biaya Bahan Baku';
+        if (akun.kategori === 'Biaya Operasional') return 'Biaya Operasional';
+        if (akun.kategori === 'Biaya Fasilitas') return 'Biaya Insentif Fasilitas';
+        if (akun.kategori === 'Pajak') return `Pungutan/Setoran ${akun.nama}`;
+        return 'Biaya Lainnya';
+    }
+    function akunKasMaster(kodeKas) {
+        if (kodeKas === '1000') return 'Petty Cash';
+        if (kodeKas === '1100') return 'Kas di Bank';
+        return (coaByKode(kodeKas) || {}).nama || '';
     }
     // All exports hit the same MASTER_4-based generator; a payload with `buku`
     // produces the full set of books, one without it a per-personel slip.
@@ -2697,7 +2814,7 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
             dayCount: Math.min(range.dayCount, 31),
             periodeLabel: range.label,
             periodeText: `Periode : ${fmtDate(range.mulai)} s.d. ${fmtDate(range.selesai)}`,
-            profil: profilBuku(),
+            profil: profilBuku(range),
             buku: bukuIsiPeriode(range),
         };
         if (busyFlag === 'bulanan') nominatifExportBusy = true; else biweeklyExportBusy = true;

@@ -57,6 +57,16 @@ const seedApp = () => {
     // A legacy row with numbers stored as text and no id: the export must repair it.
     { nama: 'Budi Santoso', departemen: 'Distribusi', pekerjaan: 'Distribusi', hari: '22', tarif: '50000', upah: 1100000, bpjs: '68000', honorPJ: 50000, grandTotal: 1218000 },
   ];
+  DB.setup.kepalaSPPG = 'Dr. Rina';
+  DB.setup.akuntan = 'Andi';
+  DB.setup.namaYayasan = 'Yayasan Sejahtera';
+  DB.setup.ketuaYayasan = 'H. Sulaiman';
+  DB.pemasok = [{ id: 'p1', nama: 'Koperasi Desa', kontak: '', alamat: '' }];
+  DB.pembelian = [{
+    id: 'pb1', status: 'terkirim', pemasokId: 'p1', akunKas: '1100',
+    tanggalTransaksi: '2026-08-03', tanggalDiterima: '2026-08-03',
+    items: [{ namaBarang: 'Beras premium', kategori: '', harga: 12000, jumlah: 40, satuan: 'kg', total: 480000 }],
+  }];
   DB.transaksi = [
     { id: 't0', tanggal: '2026-07-20', noBukti: 'J-1', uraian: 'Sisa bulan lalu', akunKas: '1100', akunLawan: '2000', tipe: 'D', jumlah: 1500000, approvalStatus: 'approved' },
     { id: 't1', tanggal: '2026-08-01', noBukti: 'A-1', uraian: 'Dana bahan makanan', akunKas: '1100', akunLawan: '2000', tipe: 'D', jumlah: 25000000, approvalStatus: 'approved' },
@@ -105,10 +115,38 @@ test('the app downloads a real workbook without anyone ticked', { skip: availabl
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.readFile(file);
   assert.deepEqual(workbook.worksheets.map((s) => s.name), [
+    'Setup', 'Saldo Buku', 'Anggaran', 'Transaksi',
     'BKU', 'BP Kas Kecil (Petty Cash)', 'BP Kas di Bank',
-    'BP Bahan Baku', 'BP Operasional', 'BP Fasilitas',
-    'BP Pajak PPN', 'Catatan', 'DafNom',
+    'BP Bahan Baku', 'BP Operasional', 'BP Fasilitas', 'BP Pajak PPN',
+    'LPA', 'SPTJ', 'BAPSD', 'Catatan', 'DafNom',
+    'Ref_Brg', 'Saldo_Brg', 'Masuk', 'Keluar', 'Stock_Brg (D)', 'Stock_Brg (R)',
   ]);
+
+  // Menu Input, filled by the app rather than left as the master's examples.
+  const setup = workbook.getWorksheet('Setup');
+  assert.equal(setup.getCell('C6').value, 'SPPG Melati');
+  assert.equal(setup.getCell('C9').value, 'Dr. Rina');
+  assert.equal(setup.getCell('C15').value, '01-08-2026');
+  assert.equal(setup.getCell('C16').value, '31-08-2026');
+
+  const transaksi = workbook.getWorksheet('Transaksi');
+  assert.equal(transaksi.getCell('F11').value, 'Dana bahan makanan');
+  assert.equal(transaksi.getCell('I11').value, 'Dana Bantuan Pemerintah');
+  assert.equal(transaksi.getCell('J11').value, 'Kas di Bank');
+  assert.equal(transaksi.getCell('J13').value, 'Petty Cash');
+
+  // Cetak Laporan: the letters carry the period's money.
+  const lpa = workbook.getWorksheet('LPA');
+  assert.equal(lpa.getCell('F19').value, 26500000, 'dana pemasukan includes last period');
+  assert.equal(lpa.getCell('F21').value, 3200000);
+  assert.equal(lpa.getCell('F22').value, 450000);
+
+  // Barang Persediaan: catalogue intact, purchases carried over.
+  assert.equal(workbook.getWorksheet('Ref_Brg').getCell('B10').value, 'Beras putih (premium)');
+  const masuk = workbook.getWorksheet('Masuk');
+  assert.equal(masuk.getCell('E312').value, 'Beras premium');
+  assert.equal(masuk.getCell('D312').value, 'Koperasi Desa');
+  assert.equal(masuk.getCell('H312').value, 40);
 
   const bku = workbook.getWorksheet('BKU');
   assert.equal(bku.getCell('E9').value, ':  SPPG Melati');

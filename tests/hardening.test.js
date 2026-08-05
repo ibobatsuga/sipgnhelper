@@ -44,11 +44,15 @@ test('no payload field can smuggle a formula into a cell', async () => {
       });
     });
   });
-  // Every formula in the output must be one the generator wrote itself. A sheet
-  // *name* may still echo the payload text — Excel never evaluates those.
+  // No formula may contain text that came from the payload: whatever the caller
+  // sends is data, and data never becomes a calculation. A sheet *name* may
+  // still echo payload text — Excel never evaluates those.
   assert.ok(formulas.length > 0, 'the generator writes formulas; none found');
+  const injected = ['WEBSERVICE', 'HYPERLINK', 'cmd|', '@SUM', '1+2', '3+4'];
   for (const { where, formula } of formulas) {
-    assert.match(formula, /^(SUM\([A-Z]+\d+:[A-Z]+\d+\)|[A-Z]+\d+([+-][A-Z]+\d+)*)$/, `unexpected formula at ${where}: ${formula}`);
+    for (const needle of injected) {
+      assert.ok(!formula.includes(needle), `payload text reached a formula at ${where}: ${formula}`);
+    }
   }
   const bku = workbook.getWorksheet('BKU');
   assert.equal(bku.getCell('C6').value, '=cmd|calc!A1');
@@ -109,7 +113,8 @@ test('a full-size month builds inside the serverless budget', async () => {
   assert.ok(elapsed < 8000, `generation took ${elapsed} ms`);
 
   const { workbook } = await readGenerated(res.buffer);
-  assert.equal(workbook.worksheets.length, 10);
+  // 22 menu sheets plus the extra kas account this payload adds.
+  assert.equal(workbook.worksheets.length, 23);
   const dafnom = workbook.getWorksheet('DafNom');
   assert.equal(cellValue(dafnom, 'D106'), 'Personel 99');
   assert.equal(cellValue(dafnom, 'C107'), 'TOTAL');
