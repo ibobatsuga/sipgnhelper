@@ -519,6 +519,19 @@
         transition: all 0.15s ease;
     }
 
+    /* The 40px height above is meant for text fields; without this a checkbox
+       inherits it and renders as a big empty box. */
+    input[type="checkbox"], input[type="radio"] {
+        width: 15px;
+        height: 15px;
+        min-height: 0;
+        padding: 0;
+        border-radius: 4px;
+        accent-color: #0d9488;
+        vertical-align: middle;
+        cursor: pointer;
+    }
+
     select {
         -webkit-appearance: none;
         appearance: none;
@@ -987,7 +1000,7 @@
     function defaultDB() {
         return {
             setup: {
-                namaSPPG: '', namaYayasan: '', kepalaSPPG: '', akuntan: '', alamat: '', rekening: '',
+                namaSPPG: '', idSPPG: '', namaYayasan: '', kepalaSPPG: '', akuntan: '', alamat: '', rekening: '',
                 approvalThreshold: 500000, periodeMulai: '', periodeSelesai: '',
                 reviewed: false, reviewedBy: '', reviewedAt: ''
             },
@@ -1023,6 +1036,7 @@
     let biweeklyExportBusy = false;
     let slipExportId = null;
     let bukuPeriodeIndex = 0;
+    let bukuParuhIndex = 0;
 
     // ---------- storage helpers (per-user rows in Supabase, isolated by RLS) ----------
     async function loadAll() {
@@ -1279,8 +1293,57 @@
     }
 
     // ---------- ledger computations (hanya transaksi yang lolos approval) ----------
+    // Import CSV/Excel menyimpan tanggal apa adanya dari berkas sumber, jadi data
+    // lama bisa berisi "05/08/2026", "5.8.26", atau nomor seri Excel. Semuanya
+    // dinormalkan ke ISO di sini supaya urutan buku, filter periode, dan ekspor
+    // membaca tanggal yang sama. Hari/bulan mengikuti urutan Indonesia (dd/mm).
+    function normalisasiTanggal(value) {
+        if (typeof value === 'number') return serialExcelKeISO(value);
+        if (typeof value !== 'string') return null;
+        const s = value.trim();
+        if (!s) return null;
+        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return tanggalValid(s) ? s : null;
+        if (/^\d+(\.\d+)?$/.test(s)) return serialExcelKeISO(Number(s));
+        const ymd = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/.exec(s);
+        if (ymd) return rakitISO(ymd[1], ymd[2], ymd[3]);
+        const dmy = /^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2}|\d{4})$/.exec(s);
+        if (dmy) {
+            const tahun = dmy[3].length === 2 ? `20${dmy[3]}` : dmy[3];
+            return rakitISO(tahun, dmy[2], dmy[1]);
+        }
+        return null;
+    }
+    function rakitISO(tahun, bulan, hari) {
+        const iso = `${tahun}-${String(bulan).padStart(2, '0')}-${String(hari).padStart(2, '0')}`;
+        return tanggalValid(iso) ? iso : null;
+    }
+    // Rejects the 31 Februari kind of date that padStart alone would let through.
+    function tanggalValid(iso) {
+        const [y, m, d] = iso.split('-').map(Number);
+        if (!y || !m || !d) return false;
+        const probe = new Date(y, m - 1, d);
+        return probe.getFullYear() === y && probe.getMonth() === m - 1 && probe.getDate() === d;
+    }
+    // Excel counts days from 1899-12-30; anything outside a plausible calendar is
+    // treated as "not a date" rather than silently becoming one.
+    function serialExcelKeISO(serial) {
+        if (!Number.isFinite(serial) || serial < 61 || serial > 2958465) return null;
+        const d = new Date(Date.UTC(1899, 11, 30) + Math.floor(serial) * 86400000);
+        return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+    }
+    // Counts approved transaksi whose date cannot be read at all. Those stay in the
+    // ledger totals — dropping them would quietly change validasi saldo — but they
+    // cannot be placed in a period, so the books report them instead of hiding them.
+    function tanggalTakTerbaca() {
+        return DB.transaksi.filter(isCounted).filter(t => !normalisasiTanggal(t.tanggal)).length;
+    }
     function sortedTransaksi() {
-        return DB.transaksi.filter(isCounted).slice().sort((a, b) => a.tanggal.localeCompare(b.tanggal) || a.id.localeCompare(b.id));
+        return DB.transaksi.filter(isCounted)
+            .map(t => {
+                const iso = normalisasiTanggal(t.tanggal);
+                return iso && iso !== t.tanggal ? { ...t, tanggal: iso } : t;
+            })
+            .sort((a, b) => String(a.tanggal).localeCompare(String(b.tanggal)) || a.id.localeCompare(b.id));
     }
     function allTransaksiSorted() {
         return DB.transaksi.slice().sort((a, b) => a.tanggal.localeCompare(b.tanggal) || a.id.localeCompare(b.id));
@@ -1584,6 +1647,7 @@
     <h2>Profil SPPG</h2>
         <div class="grid c2">
       <div class="field"><label>Nama SPPG</label><input id="f_namaSPPG" value="${s.namaSPPG || ''}"></div>
+      <div class="field"><label>ID SPPG</label><input id="f_idSPPG" value="${s.idSPPG || ''}" placeholder="Kode SPPG pada dokumen resmi"></div>
       <div class="field"><label>Nama Yayasan / Lembaga</label><input id="f_namaYayasan" value="${s.namaYayasan || ''}"></div>
       <div class="field"><label>Nama Kepala SPPG</label><input id="f_kepalaSPPG" value="${s.kepalaSPPG || ''}"></div>
       <div class="field"><label>Nama Akuntan / PLOK</label><input id="f_akuntan" value="${s.akuntan || ''}"></div>
@@ -1640,7 +1704,8 @@
     function saveSetup() {
         DB.setup = {
             ...DB.setup,
-            namaSPPG: val('f_namaSPPG') || DB.setup.namaSPPG, namaYayasan: val('f_namaYayasan') || DB.setup.namaYayasan,
+            namaSPPG: val('f_namaSPPG') || DB.setup.namaSPPG, idSPPG: val('f_idSPPG') || DB.setup.idSPPG,
+            namaYayasan: val('f_namaYayasan') || DB.setup.namaYayasan,
             kepalaSPPG: val('f_kepalaSPPG') || DB.setup.kepalaSPPG, akuntan: val('f_akuntan') || DB.setup.akuntan,
             rekening: val('f_rekening') || DB.setup.rekening, alamat: val('f_alamat') || DB.setup.alamat,
             approvalThreshold: document.getElementById('f_threshold') ? Number(val('f_threshold')) || 0 : DB.setup.approvalThreshold,
@@ -1798,7 +1863,8 @@
                     headers.forEach((h, idx) => {
                         const val = cols[idx] || '';
                         if (h.includes('tgl') || h.includes('tanggal') || h.includes('date')) {
-                            if (val) tgl = val;
+                            // Keep today's date rather than storing a string no book can read.
+                            if (val) tgl = normalisasiTanggal(val) || tgl;
                         } else if (h.includes('bukti') || h.includes('ref') || h.includes('no')) {
                             if (val) noBukti = val;
                         } else if (h.includes('uraian') || h.includes('deskripsi') || h.includes('barang') || h.includes('nama') || h.includes('keterangan')) {
@@ -2312,9 +2378,9 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
       <div class="field"><label>Hari Kerja</label><input id="n_hari" type="number" value="1"></div>
     </div>
     <div class="grid c3">
-      <div class="field"><label><input type="checkbox" id="n_bpjsKes" style="width:auto;display:inline-block;margin-right:6px;">BPJS Kesehatan (${rupiah(68000)})</label></div>
-      <div class="field"><label><input type="checkbox" id="n_bpjsTK" style="width:auto;display:inline-block;margin-right:6px;">BPJS Ketenagakerjaan (${rupiah(125000)})</label></div>
-      <div class="field"><label><input type="checkbox" id="n_honorPJ" style="width:auto;display:inline-block;margin-right:6px;">Honorarium PJ (${rupiah(50000)})</label></div>
+      <div class="field"><label><input type="checkbox" id="n_bpjsKes" style="margin-right:6px;">BPJS Kesehatan (${rupiah(68000)})</label></div>
+      <div class="field"><label><input type="checkbox" id="n_bpjsTK" style="margin-right:6px;">BPJS Ketenagakerjaan (${rupiah(125000)})</label></div>
+      <div class="field"><label><input type="checkbox" id="n_honorPJ" style="margin-right:6px;">Honorarium PJ (${rupiah(50000)})</label></div>
     </div>
     <button class="btn btn-primary" onclick="addNominatif()">Tambah ke Daftar Nominatif</button>
     <hr class="sep">
@@ -2409,6 +2475,14 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
     function monthLabel(d) {
         return d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
     }
+    // Local-time counterpart of toISOString().slice(0,10), which would report the
+    // previous day for any timezone east of Greenwich.
+    function isoDate(d) {
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+    function dayCountBetween(fromISO, toISO) {
+        return Math.round((parseISODate(toISO) - parseISODate(fromISO)) / 86400000) + 1;
+    }
     // One entry per calendar month covered by the Anggaran range. A month that the
     // range only partly covers reports just the days inside it, so the exported
     // book gets exactly the day columns that period actually pays for.
@@ -2432,6 +2506,9 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
                 label: monthLabel(monthStart) + (partial ? ` (${start.getDate()}–${end.getDate()})` : ''),
                 dayCount,
                 startDay: start.getDate(),
+                mulai: isoDate(start),
+                selesai: isoDate(end),
+                bulan: monthLabel(monthStart),
             });
             cursor.setMonth(cursor.getMonth() + 1);
         }
@@ -2443,16 +2520,151 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
     }
     function setBukuPeriode(index) {
         bukuPeriodeIndex = Number(index) || 0;
+        bukuParuhIndex = 0;
         render();
     }
-    // All exports hit the same MASTER_4-based generator; they differ only in how
-    // many workers/day columns are sent and what the resulting file is called.
-    async function requestWorkbook(workers, filename, dayCount, periodeLabel) {
+    // A biweekly book is one half of the reporting month: the 1st–15th and the
+    // 16th–end, each clipped to the part of the month the Anggaran range covers.
+    function paruhOptions() {
+        const periode = periodeInfo();
+        if (!periode) return [];
+        const start = parseISODate(periode.mulai);
+        const end = parseISODate(periode.selesai);
+        const firstEnd = new Date(start.getFullYear(), start.getMonth(), 15);
+        const secondStart = new Date(start.getFullYear(), start.getMonth(), 16);
+        const halves = [];
+        if (start <= firstEnd) halves.push([start, end < firstEnd ? end : firstEnd]);
+        if (end >= secondStart) halves.push([start > secondStart ? start : secondStart, end]);
+        return halves.map(([from, to]) => ({
+            mulai: isoDate(from),
+            selesai: isoDate(to),
+            label: `${from.getDate()}–${to.getDate()} ${periode.bulan}`,
+            dayCount: Math.round((to - from) / 86400000) + 1,
+        }));
+    }
+    function paruhInfo() {
+        const options = paruhOptions();
+        return options[Math.min(bukuParuhIndex, options.length - 1)] || null;
+    }
+    function setBukuParuh(index) {
+        bukuParuhIndex = Number(index) || 0;
+        render();
+    }
+    const BELANJA_BUKU = [
+        { key: 'bahan', jenis: 'Bahan Baku', kode: '2010' },
+        { key: 'operasional', jenis: 'Operasional', kode: '2110' },
+        { key: 'fasilitas', jenis: 'Insentif Fasilitas', kode: '2160' },
+    ];
+
+    // Builds the seven books of Bab 9 for one reporting range, in the shape the
+    // MASTER_4 generator writes out. Only transaksi that passed approval count
+    // (sortedTransaksi), matching what the Buku Otomatis screen shows; everything
+    // dated before the range collapses into the opening balances so each book
+    // stands on its own.
+    function bukuIsiPeriode(range) {
+        // A row the generator cannot date would fail the whole request, so the
+        // books are built from readable dates only; tanggalTakTerbaca() reports
+        // the rest to the operator instead of letting them vanish unnoticed.
+        const all = sortedTransaksi().filter(t => /^\d{4}-\d{2}-\d{2}$/.test(t.tanggal));
+        const sebelum = all.filter(t => t.tanggal < range.mulai);
+        const dalam = all.filter(t => t.tanggal >= range.mulai && t.tanggal <= range.selesai);
+        const arah = t => (t.tipe === 'D' ? t.jumlah : -t.jumlah);
+        const saldoAwal = list => list.reduce((total, t) => total + arah(t), 0);
+        const barisKas = t => ({
+            tanggal: t.tanggal, noBukti: t.noBukti || '', uraian: t.uraian || '',
+            debet: t.tipe === 'D' ? t.jumlah : 0, kredit: t.tipe === 'K' ? t.jumlah : 0,
+        });
+        const belanjaKode = kode => dalam.filter(t => t.akunLawan === kode && t.tipe === 'K');
+
+        const kas = DB.coa.filter(c => c.kategori === 'Kas').map(akun => ({
+            nama: akun.nama,
+            // Petty cash and bank books have separate layouts in MASTER_4.
+            jenis: akun.kode === '1000' || /petty|kas kecil/i.test(akun.nama) ? 'petty' : 'bank',
+            saldoAwal: saldoAwal(sebelum.filter(t => t.akunKas === akun.kode)),
+            rows: dalam.filter(t => t.akunKas === akun.kode).map(barisKas),
+        }));
+
+        const belanja = BELANJA_BUKU.map(def => ({
+            key: def.key,
+            jenis: def.jenis,
+            rows: belanjaKode(def.kode).map(t => ({
+                tanggal: t.tanggal, noBukti: t.noBukti || '', uraian: t.uraian || '',
+                jumlah: t.jumlah, keterangan: t.keterangan || '',
+                sumber: (coaByKode(t.akunKas) || {}).nama || '',
+            })),
+        }));
+
+        const akunPajak = DB.coa.filter(c => c.kategori === 'Pajak');
+        const terpakai = akunPajak.filter(p => dalam.some(t => t.akunLawan === p.kode));
+        // BP Pajak is one sheet per jenis pajak; keep the book present even in a
+        // period without a single tax entry.
+        const pajak = (terpakai.length ? terpakai : akunPajak.slice(0, 1)).map(p => ({
+            jenis: p.nama,
+            saldoAwal: saldoAwal(sebelum.filter(t => t.akunLawan === p.kode)),
+            rows: dalam.filter(t => t.akunLawan === p.kode)
+                .map(t => ({ ...barisKas(t), keterangan: t.keterangan || '' })),
+        }));
+
+        const kodeBelanja = BELANJA_BUKU.map(def => def.kode);
+        const harian = [];
+        for (let d = parseISODate(range.mulai), akhir = parseISODate(range.selesai); d <= akhir; d.setDate(d.getDate() + 1)) {
+            const iso = isoDate(d);
+            harian.push({
+                tanggal: iso,
+                jumlah: dalam.filter(t => t.tanggal === iso && t.tipe === 'K' && kodeBelanja.includes(t.akunLawan))
+                    .reduce((total, t) => total + t.jumlah, 0),
+            });
+        }
+
+        return {
+            bku: { saldoAwal: saldoAwal(sebelum), rows: dalam.map(barisKas) },
+            kas,
+            belanja,
+            pajak,
+            catatan: {
+                ringkasan: {
+                    sisaLalu: saldoAwal(sebelum),
+                    diterima: dalam.filter(t => t.tipe === 'D').reduce((total, t) => total + t.jumlah, 0),
+                    bahanBaku: belanjaKode('2010').reduce((total, t) => total + t.jumlah, 0),
+                    operasional: belanjaKode('2110').reduce((total, t) => total + t.jumlah, 0),
+                    fasilitas: belanjaKode('2160').reduce((total, t) => total + t.jumlah, 0),
+                },
+                rows: harian,
+            },
+        };
+    }
+    // The generator rejects a personel row that is missing a name, a job, or a
+    // number. Since a book now covers everyone by default, one malformed legacy
+    // row would fail the whole export — so rows are repaired where the fix is
+    // unambiguous (numbers coerced, text trimmed) and reported when it is not.
+    function personelUntukBuku(n, urutan) {
+        const teks = v => String(v == null ? '' : v).trim();
+        const angka = v => { const x = Number(v); return Number.isFinite(x) && x >= 0 ? x : null; };
+        const nama = teks(n.nama);
+        const pekerjaan = teks(n.pekerjaan);
+        const hari = angka(n.hari);
+        const tarif = angka(n.tarif);
+        if (!nama || !pekerjaan || hari === null || tarif === null) return null;
+        return {
+            id: teks(n.id) || `personel-${urutan + 1}`,
+            nama, pekerjaan, hari, tarif,
+            bpjs: angka(n.bpjs) ?? 0,
+            honorPJ: angka(n.honorPJ) ?? 0,
+            departemen: teks(n.departemen),
+        };
+    }
+    function profilBuku() {
+        const s = DB.setup;
+        return { namaSPPG: s.namaSPPG || '', idSPPG: s.idSPPG || '', alamat: s.alamat || '' };
+    }
+    // All exports hit the same MASTER_4-based generator; a payload with `buku`
+    // produces the full set of books, one without it a per-personel slip.
+    async function requestWorkbook(payload) {
         const res = await fetch('/api/report/generate-workbook', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ workers, filename, dayCount, periodeLabel }),
-            signal: AbortSignal.timeout(30000)
+            body: JSON.stringify(payload),
+            signal: AbortSignal.timeout(60000)
         });
         if (!res.ok) {
             const body = await res.json().catch(() => null);
@@ -2461,36 +2673,53 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url; a.download = filename; a.click();
+        a.href = url; a.download = payload.filename; a.click();
         URL.revokeObjectURL(url);
     }
-    async function downloadBukuOtomatis() {
-        const workers = DB.nominatif.filter(n => nominatifSelected.has(n.id));
-        if (workers.length === 0) { toast('Pilih minimal satu personel dulu'); return; }
-        const { dayCount, label } = periodeInfo();
-        nominatifExportBusy = true; render();
+    // Ticking personel only narrows the export. With nothing ticked the book covers
+    // everyone in the department filter that is currently shown, so downloading never
+    // requires picking a name first.
+    function bukuExportWorkers() {
+        const selected = DB.nominatif.filter(n => nominatifSelected.has(n.id));
+        if (selected.length > 0) return selected;
+        return DB.nominatif.filter(n => nominatifFilterDept === 'Semua' || n.departemen === nominatifFilterDept);
+    }
+    // Both books are the same report over a different range: the whole reporting
+    // month, or one half of it.
+    async function unduhBuku(range, filename, busyFlag) {
+        if (!range) { toast('Tentukan periode anggaran dulu di Setup & Profil'); return; }
+        const kandidat = bukuExportWorkers();
+        const workers = kandidat.map(personelUntukBuku).filter(Boolean);
+        const personelDilewati = kandidat.length - workers.length;
+        const payload = {
+            filename,
+            workers,
+            dayCount: Math.min(range.dayCount, 31),
+            periodeLabel: range.label,
+            periodeText: `Periode : ${fmtDate(range.mulai)} s.d. ${fmtDate(range.selesai)}`,
+            profil: profilBuku(),
+            buku: bukuIsiPeriode(range),
+        };
+        if (busyFlag === 'bulanan') nominatifExportBusy = true; else biweeklyExportBusy = true;
+        render();
         try {
-            await requestWorkbook(workers, 'Buku_Otomatis_Nominatif.xlsx', dayCount, label);
-            toast(`Buku ${label} untuk ${workers.length} personel berhasil diunduh`);
+            await requestWorkbook(payload);
+            const catatan = [];
+            if (personelDilewati > 0) catatan.push(`${personelDilewati} personel dilewati (data tidak lengkap)`);
+            if (tanggalTakTerbaca() > 0) catatan.push(`${tanggalTakTerbaca()} transaksi tanpa tanggal terbaca tidak ikut`);
+            toast(`Buku ${range.label} berhasil diunduh${catatan.length ? ' — ' + catatan.join(', ') : ''}`);
         } catch (error) {
             toast(error.message || 'Koneksi ke server gagal, workbook tidak dapat dibuat');
         } finally {
-            nominatifExportBusy = false; render();
+            if (busyFlag === 'bulanan') nominatifExportBusy = false; else biweeklyExportBusy = false;
+            render();
         }
     }
-    async function downloadBukuBiweekly() {
-        const workers = DB.nominatif.filter(n => nominatifSelected.has(n.id));
-        if (workers.length === 0) { toast('Pilih minimal satu personel dulu'); return; }
-        biweeklyExportBusy = true; render();
-        try {
-            // 10 day columns is DafNom's native span: two blocks of five working days.
-            await requestWorkbook(workers, 'Buku_Biweekly_Nominatif.xlsx', 10, periodeInfo().label);
-            toast(`Buku biweekly untuk ${workers.length} personel berhasil diunduh`);
-        } catch (error) {
-            toast(error.message || 'Koneksi ke server gagal, workbook tidak dapat dibuat');
-        } finally {
-            biweeklyExportBusy = false; render();
-        }
+    function downloadBukuOtomatis() {
+        return unduhBuku(periodeInfo(), 'Buku_Otomatis_Bulanan.xlsx', 'bulanan');
+    }
+    function downloadBukuBiweekly() {
+        return unduhBuku(paruhInfo(), 'Buku_Otomatis_Biweekly.xlsx', 'biweekly');
     }
     async function downloadSlipGaji(id) {
         if (slipExportId) return;
@@ -2500,7 +2729,9 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
         slipExportId = id; render();
         try {
             const safeName = worker.nama.replace(/[^\w-]+/g, '_').slice(0, 40) || 'Personel';
-            await requestWorkbook([worker], `Slip_Gaji_${safeName}.xlsx`, dayCount, label);
+            await requestWorkbook({
+                filename: `Slip_Gaji_${safeName}.xlsx`, workers: [worker], dayCount, periodeLabel: label,
+            });
             toast(`Slip gaji ${worker.nama} berhasil diunduh`);
         } catch (error) {
             toast(error.message || 'Koneksi ke server gagal, slip tidak dapat dibuat');
@@ -2545,28 +2776,44 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
         else if (bukuSubtab === 'bpfas') body = bukuBP('2150', '2160', 'Insentif Fasilitas');
         else if (bukuSubtab === 'bppajak') body = bukuBPPajak();
         else if (bukuSubtab === 'catatan') body = bukuCatatan();
+        // Counted the same way the export builds its payload, so the number on
+        // screen is the number of personel that actually reach the workbook.
+        const exportCount = bukuExportWorkers().map(personelUntukBuku).filter(Boolean).length;
+        const paruhList = paruhOptions();
+        const paruh = paruhInfo();
         return `
     ${renderNominatifSelector()}
 
     <div class="card">
     <h2>Buku Kas &amp; Pembantu</h2>
-    <div class="note blue" style="margin-top:0;margin-bottom:16px;">Hanya transaksi yang sudah disetujui yang dihitung.</div>
-    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px;">
+    <div class="note blue" style="margin-top:0;margin-bottom:16px;">Hanya transaksi yang sudah disetujui dan berada pada periode terpilih yang dihitung.</div>
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:8px;">
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
-        <button class="btn btn-outline" ${nominatifSelected.size === 0 || biweeklyExportBusy ? 'disabled' : ''} onclick="downloadBukuBiweekly()">
-          ${biweeklyExportBusy ? 'Membuat Workbook…' : 'Unduh Buku Biweekly (10 Hari Kerja)'}
+        <button class="btn btn-outline" ${!paruh || biweeklyExportBusy ? 'disabled' : ''} onclick="downloadBukuBiweekly()">
+          ${biweeklyExportBusy ? 'Membuat Workbook…' : `Unduh Buku Biweekly${paruh ? ` (${paruh.label})` : ''}`}
         </button>
-        <button class="btn btn-gold" ${nominatifSelected.size === 0 || nominatifExportBusy ? 'disabled' : ''} onclick="downloadBukuOtomatis()">
-          ${nominatifExportBusy ? 'Membuat Workbook…' : `Unduh Buku Bulanan (${nominatifSelected.size} terpilih)`}
+        <button class="btn btn-gold" ${nominatifExportBusy ? 'disabled' : ''} onclick="downloadBukuOtomatis()">
+          ${nominatifExportBusy ? 'Membuat Workbook…' : `Unduh Buku Bulanan (${periodeInfo() ? periodeInfo().label : 'periode berjalan'})`}
         </button>
       </div>
-      <div class="field" style="margin-bottom:0;min-width:240px;">
-        <label>Periode Anggaran</label>
-        <select onchange="setBukuPeriode(this.value)">
-          ${periodeOptions().map((o, i) => `<option value="${i}" ${i === bukuPeriodeIndex ? 'selected' : ''}>${o.label} · ${o.dayCount} hari</option>`).join('')}
-        </select>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;">
+        <div class="field" style="margin-bottom:0;min-width:240px;">
+          <label>Periode Anggaran</label>
+          <select onchange="setBukuPeriode(this.value)">
+            ${periodeOptions().map((o, i) => `<option value="${i}" ${i === bukuPeriodeIndex ? 'selected' : ''}>${o.label} · ${o.dayCount} hari</option>`).join('')}
+          </select>
+        </div>
+        <div class="field" style="margin-bottom:0;min-width:180px;">
+          <label>Paruh (Biweekly)</label>
+          <select onchange="setBukuParuh(this.value)" ${paruhList.length === 0 ? 'disabled' : ''}>
+            ${paruhList.map((o, i) => `<option value="${i}" ${i === bukuParuhIndex ? 'selected' : ''}>${o.label} · ${o.dayCount} hari</option>`).join('')}
+          </select>
+        </div>
       </div>
     </div>
+    ${tanggalTakTerbaca() > 0 ? `<div class="note" style="margin-top:0;margin-bottom:12px;background:#fef3c7;border-color:#f59e0b;color:#92400e;">
+      ${tanggalTakTerbaca()} transaksi punya tanggal yang tidak terbaca (biasanya dari import CSV) sehingga tidak masuk buku periode mana pun. Perbaiki tanggalnya di menu Transaksi sebelum menutup periode.</div>` : ''}
+    <p class="sub" style="margin-bottom:18px;">Workbook mengikuti format MASTER_4: BKU, BP Kas, BP Bahan Baku, BP Operasional, BP Fasilitas, BP Pajak, Catatan Pengeluaran, dan Daftar Nominatif (${exportCount} personel) — semuanya berisi transaksi yang sudah disetujui pada rentang di atas.</p>
     <div class="subtabs">${subs.map(s => `<button class="subtab ${s.id === bukuSubtab ? 'active' : ''}" onclick="setBukuSub('${s.id}')">${s.label}</button>`).join('')}</div>
     ${body}
     </div>
@@ -2581,7 +2828,7 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
         return `
     <div class="card">
       <h2>Ekspor Slip Nominatif per Personel</h2>
-      <p class="sub">Centang personel untuk disertakan di Buku Otomatis di bawah, atau unduh slip gaji satu orang lewat tombol di tiap baris.</p>
+      <p class="sub">Tanpa centang, Buku Otomatis di bawah memuat seluruh personel sesuai filter departemen. Centang hanya bila ingin membatasi isinya, atau unduh slip gaji satu orang lewat tombol di tiap baris.</p>
       ${DB.nominatif.length === 0 ? '<div class="empty">Belum ada data nominatif. Tambahkan dulu di menu Pajak &amp; Upah.</div>' : `
       <div class="field" style="max-width:260px;"><label>Filter Departemen</label><select id="n_filterDept" onchange="filterNominatifDept(this.value)">${deptFilterOpt}</select></div>
       ${rows.length === 0 ? '<div class="empty">Tidak ada data untuk departemen ini.</div>' : `
@@ -2599,8 +2846,17 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
     </div>`;
     }
 
+    // The books on screen show the same period the export writes out, so what the
+    // reviewer checks in Bab 9.1 is what lands in the workbook. The running saldo
+    // is computed over the full history first and only then clipped, so a period
+    // opens on the balance it inherits.
+    function dalamPeriodeBuku(rows) {
+        const periode = periodeInfo();
+        if (!periode) return rows;
+        return rows.filter(r => r.tanggal >= periode.mulai && r.tanggal <= periode.selesai);
+    }
     function bukuBKU() {
-        const rows = ledgerAllKas();
+        const rows = dalamPeriodeBuku(ledgerAllKas());
         return `<div class="card">
     <h2>Buku Kas Umum (BKU)</h2>
     ${rows.length === 0 ? '<div class="empty">Belum ada data.</div>' : `
@@ -2613,7 +2869,7 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
     function bukuBPKas() {
         const kasAccounts = DB.coa.filter(c => c.kategori === 'Kas');
         return kasAccounts.map(ka => {
-            const rows = ledgerForKas(ka.kode);
+            const rows = dalamPeriodeBuku(ledgerForKas(ka.kode));
             return `<div class="card">
       <h2>BP Kas — ${ka.nama}</h2>
       ${rows.length === 0 ? '<div class="empty">Belum ada data.</div>' : `
@@ -2625,7 +2881,7 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
         }).join('');
     }
     function bukuBP(kodeMasuk, kodeBiaya, label) {
-        const rows = ledgerBP(kodeMasuk, kodeBiaya);
+        const rows = dalamPeriodeBuku(ledgerBP(kodeMasuk, kodeBiaya));
         return `<div class="card">
     <h2>Buku Pembantu — ${label}</h2>
     
@@ -2638,7 +2894,7 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
     }
     function bukuBPPajak() {
         const kodePajak = DB.coa.filter(c => c.kategori === 'Pajak').map(c => c.kode);
-        const rows = sortedTransaksi().filter(t => kodePajak.includes(t.akunLawan));
+        const rows = dalamPeriodeBuku(sortedTransaksi().filter(t => kodePajak.includes(t.akunLawan)));
         const totalPerJenis = {};
         rows.forEach(r => { totalPerJenis[r.akunLawan] = (totalPerJenis[r.akunLawan] || 0) + r.jumlah; });
         return `<div class="card">
@@ -2654,7 +2910,7 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
   </div>`;
     }
     function bukuCatatan() {
-        const rows = sortedTransaksi().filter(t => t.tipe === 'K').slice().reverse();
+        const rows = dalamPeriodeBuku(sortedTransaksi().filter(t => t.tipe === 'K')).slice().reverse();
         return `<div class="card">
     <h2>Catatan Pengeluaran</h2>
     ${rows.length === 0 ? '<div class="empty">Belum ada pengeluaran.</div>' : `
