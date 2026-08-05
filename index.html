@@ -1348,6 +1348,8 @@ BB.07.099|Bahan minuman pendamping-lainnya|pcs
     let ocrBusy = false;
     let nominatifFilterDept = 'Semua';
     let cariBarang = '';
+    // Data yang gagal tersimpan ke server; ditampilkan sampai penyimpanan berhasil.
+    const gagalSimpan = new Set();
     let nominatifSelected = new Set();
     let nominatifExportBusy = false;
     let biweeklyExportBusy = false;
@@ -1380,7 +1382,16 @@ BB.07.099|Bahan minuman pendamping-lainnya|pcs
                 user_id: currentUser.id, key, value: DB[key], updated_at: new Date().toISOString()
             });
             if (error) throw error;
-        } catch (e) { console.error('storage save failed', key, e); }
+            if (gagalSimpan.delete(key) && gagalSimpan.size === 0) render();
+        } catch (e) {
+            console.error('storage save failed', key, e);
+            // A silent failure is the worst outcome here: the screen keeps showing
+            // data that never reached the server, and a refresh loses it. Bab 12 of
+            // the panduan tells the operator to stop and check, so say so.
+            gagalSimpan.add(key);
+            toast('Gagal menyimpan ke server. Jangan tutup halaman — periksa koneksi lalu ulangi.');
+            render();
+        }
     }
     // Keeps the "Buku Otomatis" checkbox selection alive across an accidental page refresh.
     function loadNominatifSelection() {
@@ -1468,16 +1479,24 @@ BB.07.099|Bahan minuman pendamping-lainnya|pcs
     function triggerManualDailyRefresh() {
         checkAndRunDailyRefresh(true);
     }
+    // Setiap layar dipasang lewat innerHTML, jadi teks apa pun yang berasal dari
+    // pengguna, hasil OCR, atau berkas impor wajib dilewatkan ke sini dulu —
+    // termasuk saat masuk ke dalam atribut seperti value="" atau onclick="".
+    function esc(value) {
+        return String(value === null || value === undefined ? '' : value)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
     function rupiah(n) { n = Number(n) || 0; return 'Rp ' + n.toLocaleString('id-ID'); }
     function fmtDate(d) { if (!d) return '-'; const dt = new Date(d); return dt.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }); }
     function coaByKode(k) { return DB.coa.find(c => c.kode === k); }
     function coaOptions(filterKategori) {
         return DB.coa.filter(c => !filterKategori || filterKategori.includes(c.kategori))
-            .map(c => `<option value="${c.kode}">${c.kode} - ${c.nama}</option>`).join('');
+            .map(c => `<option value="${esc(c.kode)}">${esc(c.kode)} - ${esc(c.nama)}</option>`).join('');
     }
     function pemasokOptions(selId) {
         if (DB.pemasok.length === 0) return '<option value="">(belum ada pemasok)</option>';
-        return DB.pemasok.map(p => `<option value="${p.id}" ${p.id === selId ? 'selected' : ''}>${p.nama}</option>`).join('');
+        return DB.pemasok.map(p => `<option value="${p.id}" ${p.id === selId ? 'selected' : ''}>${esc(p.nama)}</option>`).join('');
     }
     function downloadCSV(filename, headers, rows) {
         let csv = headers.join(';') + '\n';
@@ -1764,16 +1783,17 @@ BB.07.099|Bahan minuman pendamping-lainnya|pcs
         if (subEl && titles[activeTab]) subEl.textContent = titles[activeTab].s;
 
         const c = document.getElementById('content');
-        if (activeTab === 'dashboard') c.innerHTML = renderDashboard();
-        else if (activeTab === 'approval') c.innerHTML = renderApproval();
-        else if (activeTab === 'setup') c.innerHTML = renderSetup();
-        else if (activeTab === 'transaksi') c.innerHTML = renderTransaksi();
-        else if (activeTab === 'ocr') c.innerHTML = renderOcr();
-        else if (activeTab === 'sipgn') c.innerHTML = renderSipgn();
-        else if (activeTab === 'kas') c.innerHTML = renderKas();
-        else if (activeTab === 'pajak') c.innerHTML = renderPajak();
-        else if (activeTab === 'buku') c.innerHTML = renderBuku();
-        else if (activeTab === 'laporan') c.innerHTML = renderLaporan();
+        const peringatanSimpan = gagalSimpan.size > 0
+            ? `<div class="note" style="background:#fee2e2;border-color:#ef4444;color:#991b1b;margin-bottom:16px;">
+                 Ada ${gagalSimpan.size} data yang belum tersimpan ke server (${esc([...gagalSimpan].join(', '))}).
+                 Periksa koneksi, lalu simpan ulang sebelum menutup halaman.</div>`
+            : '';
+        const layar = {
+            dashboard: renderDashboard, approval: renderApproval, setup: renderSetup,
+            transaksi: renderTransaksi, ocr: renderOcr, sipgn: renderSipgn,
+            kas: renderKas, pajak: renderPajak, buku: renderBuku, laporan: renderLaporan,
+        }[activeTab];
+        if (layar) c.innerHTML = peringatanSimpan + layar();
     }
     function setTab(id) {
         activeTab = id; draftPembelian = null; render();
@@ -1822,7 +1842,7 @@ BB.07.099|Bahan minuman pendamping-lainnya|pcs
             <div class="hero-title">Aktivitas SCM &amp; Keuangan</div>
             <div class="hero-val">${jmlTransaksi} Transaksi Total</div>
           </div>
-          <span class="hero-badge-pill">Periode ${DB.anggaran.periode || getCurrentPeriodName()}</span>
+          <span class="hero-badge-pill">Periode ${esc(DB.anggaran.periode || getCurrentPeriodName())}</span>
         </div>
         <div style="margin: 14px 0 6px 0; font-size: 12px; opacity: 0.9; line-height: 1.6;">
           Statistik pengadaan bahan baku, transaksi operasional &amp; sinkronisasi laporan otomatis SPPG.
@@ -1876,8 +1896,8 @@ BB.07.099|Bahan minuman pendamping-lainnya|pcs
                   ${t.tipe === 'D' ? '📥' : '🛒'}
                 </div>
                 <div style="flex:1;">
-                  <div style="font-weight:700; font-size:13.5px; color:#0f172a;">${t.uraian}</div>
-                  <div style="font-size:11.5px; color:#64748b;">${fmtDate(t.tanggal)} · ${coaByKode(t.akunKas)?.nama || t.akunKas}</div>
+                  <div style="font-weight:700; font-size:13.5px; color:#0f172a;">${esc(t.uraian)}</div>
+                  <div style="font-size:11.5px; color:#64748b;">${fmtDate(t.tanggal)} · ${esc(coaByKode(t.akunKas)?.nama || t.akunKas)}</div>
                 </div>
                 <div style="font-weight:800; font-size:13.5px; color:${t.tipe === 'D' ? '#16a34a' : '#0f172a'};">
                   ${t.tipe === 'D' ? '+' : '-'}${rupiah(t.jumlah)}
@@ -1939,7 +1959,7 @@ BB.07.099|Bahan minuman pendamping-lainnya|pcs
       <div class="approval-row">
         <div>
           <span class="badge badge-warn">${typeLabel[a.type] || a.type}</span>
-          <b style="margin-left:6px;">${a.deskripsi}</b>
+          <b style="margin-left:6px;">${esc(a.deskripsi)}</b>
           <div class="small muted">${fmtDate(a.tanggal)} ${a.jumlah ? '· ' + rupiah(a.jumlah) : ''}</div>
         </div>
         <div class="row-actions">
@@ -1952,7 +1972,7 @@ BB.07.099|Bahan minuman pendamping-lainnya|pcs
     <h2>Riwayat Keputusan</h2>
     ${hist.length === 0 ? '<div class="empty">Belum ada riwayat.</div>' : `
     <table><thead><tr><th>Tanggal</th><th>Jenis</th><th>Deskripsi</th><th class="right">Jumlah</th><th>Status</th></tr></thead>
-    <tbody>${hist.map(a => `<tr><td>${fmtDate(a.tanggal)}</td><td>${typeLabel[a.type] || a.type}</td><td>${a.deskripsi}</td>
+    <tbody>${hist.map(a => `<tr><td>${fmtDate(a.tanggal)}</td><td>${typeLabel[a.type] || a.type}</td><td>${esc(a.deskripsi)}</td>
       <td class="right">${a.jumlah ? rupiah(a.jumlah) : '-'}</td>
       <td>${a.status === 'approved' ? '<span class="badge badge-ok">Disetujui</span>' : '<span class="badge badge-bad">Ditolak</span>'}</td></tr>`).join('')}
     </tbody></table>`}
@@ -1967,14 +1987,14 @@ BB.07.099|Bahan minuman pendamping-lainnya|pcs
   <div class="card">
     <h2>Profil SPPG</h2>
         <div class="grid c2">
-      <div class="field"><label>Nama SPPG</label><input id="f_namaSPPG" value="${s.namaSPPG || ''}"></div>
-      <div class="field"><label>ID SPPG</label><input id="f_idSPPG" value="${s.idSPPG || ''}" placeholder="Kode SPPG pada dokumen resmi"></div>
-      <div class="field"><label>Nama Yayasan / Lembaga</label><input id="f_namaYayasan" value="${s.namaYayasan || ''}"></div>
-      <div class="field"><label>Ketua Yayasan / Yang Mewakili</label><input id="f_ketuaYayasan" value="${s.ketuaYayasan || ''}"></div>
-      <div class="field"><label>Nama Kepala SPPG</label><input id="f_kepalaSPPG" value="${s.kepalaSPPG || ''}"></div>
-      <div class="field"><label>Nama Akuntan / PLOK</label><input id="f_akuntan" value="${s.akuntan || ''}"></div>
-      <div class="field"><label>Nomor Rekening / VA</label><input id="f_rekening" value="${s.rekening || ''}"></div>
-      <div class="field"><label>Alamat</label><input id="f_alamat" value="${s.alamat || ''}"></div>
+      <div class="field"><label>Nama SPPG</label><input id="f_namaSPPG" value="${esc(s.namaSPPG || '')}"></div>
+      <div class="field"><label>ID SPPG</label><input id="f_idSPPG" value="${esc(s.idSPPG || '')}" placeholder="Kode SPPG pada dokumen resmi"></div>
+      <div class="field"><label>Nama Yayasan / Lembaga</label><input id="f_namaYayasan" value="${esc(s.namaYayasan || '')}"></div>
+      <div class="field"><label>Ketua Yayasan / Yang Mewakili</label><input id="f_ketuaYayasan" value="${esc(s.ketuaYayasan || '')}"></div>
+      <div class="field"><label>Nama Kepala SPPG</label><input id="f_kepalaSPPG" value="${esc(s.kepalaSPPG || '')}"></div>
+      <div class="field"><label>Nama Akuntan / PLOK</label><input id="f_akuntan" value="${esc(s.akuntan || '')}"></div>
+      <div class="field"><label>Nomor Rekening / VA</label><input id="f_rekening" value="${esc(s.rekening || '')}"></div>
+      <div class="field"><label>Alamat</label><input id="f_alamat" value="${esc(s.alamat || '')}"></div>
     </div>
     <button class="btn btn-primary" onclick="saveSetup()">Simpan Profil</button>
   </div>
@@ -1983,11 +2003,11 @@ BB.07.099|Bahan minuman pendamping-lainnya|pcs
     <h2>Data Pelaporan</h2>
     <p class="sub" style="margin-top:-4px;">Dicetak pada surat LPA, SPTJ, dan Berita Acara Sisa Dana di Buku Otomatis. Boleh dikosongkan bila belum ada nomornya.</p>
     <div class="grid c3">
-      <div class="field"><label>Tahun Anggaran</label><input id="f_tahunAnggaran" value="${s.tahunAnggaran || ''}" placeholder="cth: 2026"></div>
-      <div class="field"><label>Tempat Pelaporan</label><input id="f_tempatPelaporan" value="${s.tempatPelaporan || ''}" placeholder="cth: Bandung"></div>
-      <div class="field"><label>Tanggal Pelaporan</label><input id="f_tanggalPelaporan" value="${s.tanggalPelaporan || ''}" placeholder="cth: 31 Agustus 2026"></div>
-      <div class="field"><label>Nomor LPA</label><input id="f_nomorLPA" value="${s.nomorLPA || ''}"></div>
-      <div class="field"><label>Nomor Berita Acara Sisa Dana</label><input id="f_nomorBAPSD" value="${s.nomorBAPSD || ''}"></div>
+      <div class="field"><label>Tahun Anggaran</label><input id="f_tahunAnggaran" value="${esc(s.tahunAnggaran || '')}" placeholder="cth: 2026"></div>
+      <div class="field"><label>Tempat Pelaporan</label><input id="f_tempatPelaporan" value="${esc(s.tempatPelaporan || '')}" placeholder="cth: Bandung"></div>
+      <div class="field"><label>Tanggal Pelaporan</label><input id="f_tanggalPelaporan" value="${esc(s.tanggalPelaporan || '')}" placeholder="cth: 31 Agustus 2026"></div>
+      <div class="field"><label>Nomor LPA</label><input id="f_nomorLPA" value="${esc(s.nomorLPA || '')}"></div>
+      <div class="field"><label>Nomor Berita Acara Sisa Dana</label><input id="f_nomorBAPSD" value="${esc(s.nomorBAPSD || '')}"></div>
     </div>
     <button class="btn btn-primary" onclick="saveSetup()">Simpan Data Pelaporan</button>
   </div>
@@ -1996,8 +2016,8 @@ BB.07.099|Bahan minuman pendamping-lainnya|pcs
     <h2>Ambang Approval &amp; Periode</h2>
         <div class="grid c3">
       <div class="field"><label>Ambang Approval (Rp)</label><input id="f_threshold" type="number" value="${s.approvalThreshold || 0}"></div>
-      <div class="field"><label>Periode Mulai</label><input id="f_periodeMulai" type="date" value="${s.periodeMulai || ''}"></div>
-      <div class="field"><label>Periode Selesai</label><input id="f_periodeSelesai" type="date" value="${s.periodeSelesai || ''}"></div>
+      <div class="field"><label>Periode Mulai</label><input id="f_periodeMulai" type="date" value="${esc(s.periodeMulai || '')}"></div>
+      <div class="field"><label>Periode Selesai</label><input id="f_periodeSelesai" type="date" value="${esc(s.periodeSelesai || '')}"></div>
     </div>
     <button class="btn btn-primary" onclick="saveSetup()">Simpan</button>
   </div>
@@ -2005,9 +2025,9 @@ BB.07.099|Bahan minuman pendamping-lainnya|pcs
   <div class="card">
     <h2>Anggaran Periode Berjalan</h2>
     <div class="grid c3">
-      <div class="field"><label>Nama Periode</label><input id="f_periode" placeholder="cth: ${getCurrentPeriodName()}" value="${a.periode || getCurrentPeriodName()}"></div>
-      <div class="field"><label>Periode Mulai</label><input id="f_angMulai" type="date" value="${a.mulai || s.periodeMulai || ''}" onchange="syncAnggaranNama()"></div>
-      <div class="field"><label>Periode Selesai</label><input id="f_angSelesai" type="date" value="${a.selesai || s.periodeSelesai || ''}" onchange="syncAnggaranNama()"></div>
+      <div class="field"><label>Nama Periode</label><input id="f_periode" placeholder="cth: ${getCurrentPeriodName()}" value="${esc(a.periode || getCurrentPeriodName())}"></div>
+      <div class="field"><label>Periode Mulai</label><input id="f_angMulai" type="date" value="${esc(a.mulai || s.periodeMulai || '')}" onchange="syncAnggaranNama()"></div>
+      <div class="field"><label>Periode Selesai</label><input id="f_angSelesai" type="date" value="${esc(a.selesai || s.periodeSelesai || '')}" onchange="syncAnggaranNama()"></div>
     </div>
     <p class="sub" style="margin-top:-4px;">Rentang tanggal ini yang dipakai sebagai pilihan periode saat mengunduh Buku Otomatis.</p>
     <div class="grid c3">
@@ -2022,7 +2042,7 @@ BB.07.099|Bahan minuman pendamping-lainnya|pcs
     <h2>Referensi Barang Persediaan</h2>
     <p class="sub" style="margin-top:-4px;">Katalog bawaan mengikuti MASTER_4 dan ikut tercetak pada sheet Barang Persediaan di Buku Otomatis. Tambahkan item sendiri bila belum ada di daftar.</p>
     <div class="grid c4">
-      <div class="field"><label>Sub-Kelompok</label><select id="b_sub">${subKelompokBarang().map(sub => `<option value="${sub.kode}">${sub.kode} - ${sub.nama}</option>`).join('')}</select></div>
+      <div class="field"><label>Sub-Kelompok</label><select id="b_sub">${subKelompokBarang().map(sub => `<option value="${esc(sub.kode)}">${esc(sub.kode)} - ${esc(sub.nama)}</option>`).join('')}</select></div>
       <div class="field"><label>Nama Barang</label><input id="b_nama" placeholder="cth: Beras merah organik"></div>
       <div class="field"><label>Satuan</label><select id="b_satuan">${['kg', 'pak', 'liter', 'ikat', 'pcs', 'botol', 'dus'].map(u => `<option value="${u}">${u}</option>`).join('')}</select></div>
       <div class="field" style="display:flex;align-items:flex-end;"><button class="btn btn-gold" style="width:100%;" onclick="addBarang()">Tambah Barang</button></div>
@@ -2038,7 +2058,7 @@ BB.07.099|Bahan minuman pendamping-lainnya|pcs
     <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;">
       <div class="field" style="margin-bottom:0;max-width:320px;flex:1;">
         <label>Cari Barang</label>
-        <input value="${cariBarang}" oninput="filterBarang(this.value)" placeholder="Nama atau kode barang">
+        <input value="${esc(cariBarang)}" oninput="filterBarang(this.value)" placeholder="Nama atau kode barang">
       </div>
       <div class="small muted" style="padding-bottom:10px;">
         ${DB.barang.filter(b => b.level === 3).length} item dalam ${subKelompokBarang().length} sub-kelompok
@@ -2047,8 +2067,8 @@ BB.07.099|Bahan minuman pendamping-lainnya|pcs
     ${item.length === 0 ? '<div class="empty">Tidak ada barang yang cocok.</div>' : `
     <table><thead><tr><th>Kode</th><th>Nama Barang</th><th>Kelompok</th><th>Satuan</th><th></th></tr></thead>
     <tbody>${tampil.map(b => `<tr>
-      <td>${b.kode}</td><td>${b.nama}</td><td class="small muted">${namaKelompok(b.kode)}</td><td>${b.satuan}</td>
-      <td><button class="link-btn" onclick="delBarang('${b.kode}')">hapus</button></td></tr>`).join('')}
+      <td>${esc(b.kode)}</td><td>${esc(b.nama)}</td><td class="small muted">${esc(namaKelompok(b.kode))}</td><td>${esc(b.satuan)}</td>
+      <td><button class="link-btn" onclick="delBarang('${esc(b.kode)}')">hapus</button></td></tr>`).join('')}
     </tbody></table>
     ${item.length > tampil.length ? `<p class="small muted">Menampilkan ${tampil.length} dari ${item.length} item — persempit dengan kotak pencarian.</p>` : ''}`}`;
     })()}
@@ -2068,7 +2088,7 @@ BB.07.099|Bahan minuman pendamping-lainnya|pcs
     ${DB.pemasok.length === 0 ? '<div class="empty">Belum ada pemasok.</div>' : `
     <table><thead><tr><th>Nama</th><th>Kontak</th><th>Alamat</th><th></th></tr></thead>
     <tbody>
-      ${DB.pemasok.map(p => `<tr><td>${p.nama}</td><td>${p.kontak || '-'}</td><td>${p.alamat || '-'}</td>
+      ${DB.pemasok.map(p => `<tr><td>${esc(p.nama)}</td><td>${esc(p.kontak || '-')}</td><td>${esc(p.alamat || '-')}</td>
       <td><button class="link-btn" onclick="delPemasok('${p.id}')">hapus</button></td></tr>`).join('')}
     </tbody></table>`}
   </div>
@@ -2170,7 +2190,7 @@ BB.07.099|Bahan minuman pendamping-lainnya|pcs
         if (!item) return;
         DB.barang = DB.barang.filter(b => b.kode !== kode);
         save('barang'); render();
-        toast(`${item.nama} dihapus dari katalog`);
+        toast(`${esc(item.nama)} dihapus dari katalog`);
     }
     function filterBarang(nilai) {
         cariBarang = nilai;
@@ -2217,8 +2237,8 @@ BB.07.099|Bahan minuman pendamping-lainnya|pcs
     <table><thead><tr><th>Tanggal</th><th>No Bukti</th><th>Uraian</th><th>Akun Kas</th><th>Akun Lawan</th><th class="right">Debit</th><th class="right">Kredit</th><th>Status</th><th></th></tr></thead>
     <tbody>
       ${rows.map(t => `<tr>
-        <td>${fmtDate(t.tanggal)}</td><td>${t.noBukti || '-'}</td><td>${t.uraian}</td>
-        <td>${coaByKode(t.akunKas)?.nama || t.akunKas}</td><td>${coaByKode(t.akunLawan)?.nama || t.akunLawan}</td>
+        <td>${fmtDate(t.tanggal)}</td><td>${esc(t.noBukti || '-')}</td><td>${esc(t.uraian)}</td>
+        <td>${esc(coaByKode(t.akunKas)?.nama || t.akunKas)}</td><td>${esc(coaByKode(t.akunLawan)?.nama || t.akunLawan)}</td>
         <td class="right">${t.tipe === 'D' ? rupiah(t.jumlah) : '-'}</td>
         <td class="right">${t.tipe === 'K' ? rupiah(t.jumlah) : '-'}</td>
         <td>${statusBadge(t)}</td>
@@ -2367,7 +2387,7 @@ BB.07.099|Bahan minuman pendamping-lainnya|pcs
     <h2>OCR Struk &amp; Import Data Belanja</h2>
     <p class="sub">Foto struk (baca otomatis AI) atau unggah file Excel / CSV berisi daftar pengeluaran belanja.</p>
     <div class="grid c2">
-      <div class="field"><label>Nama Kamu / Pengirim</label><input id="ocrq_nama" value="${s.namaPengirimDefault || ''}" placeholder="cth: Budi (Gudang)"></div>
+      <div class="field"><label>Nama Kamu / Pengirim</label><input id="ocrq_nama" value="${esc(s.namaPengirimDefault || '')}" placeholder="cth: Budi (Gudang)"></div>
       <div class="field"><label>Foto Struk/Nota</label><input type="file" id="ocrq_file" accept="image/*" capture="environment"></div>
     </div>
     <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:10px; align-items:center;">
@@ -2394,7 +2414,7 @@ BB.07.099|Bahan minuman pendamping-lainnya|pcs
         <div style="display:flex;gap:10px;">
           ${o.thumb ? `<img src="data:image/jpeg;base64,${o.thumb}" style="width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid var(--line);">` : ''}
           <div>
-            <b>${e.vendor || 'Vendor tidak terbaca'}</b> · ${rupiah(total)}
+            <b>${esc(e.vendor || 'Vendor tidak terbaca')}</b> · ${rupiah(total)}
             <div class="small muted">Dikirim oleh ${o.submittedBy || '-'} · ${fmtDate(o.tanggalKirim)} · struk tgl ${fmtDate(e.tanggal)}</div>
             <div class="small muted">${(e.items || []).map(i => i.nama + ' x' + i.jumlah).join(', ') || '-'}</div>
           </div>
@@ -2413,7 +2433,7 @@ BB.07.099|Bahan minuman pendamping-lainnya|pcs
             html += '<hr class="sep"><div class="small muted" style="margin-bottom:6px;"><b>Sudah diproses (10 terbaru):</b></div>';
             html += done.map(o => {
                 const e = o.extracted || {};
-                return `<div class="small muted" style="padding:4px 0;">${fmtDate(o.tanggalKirim)} · ${e.vendor || '-'} · ${rupiah(Number(e.total) || 0)} · oleh ${o.submittedBy || '-'}</div>`;
+                return `<div class="small muted" style="padding:4px 0;">${fmtDate(o.tanggalKirim)} · ${esc(e.vendor || '-')} · ${rupiah(Number(e.total) || 0)} · oleh ${o.submittedBy || '-'}</div>`;
             }).join('');
         }
         return html;
@@ -2531,7 +2551,7 @@ BB.07.099|Bahan minuman pendamping-lainnya|pcs
             const pm = DB.pemasok.find(x => x.id === p.pemasokId);
             const total = p.items.reduce((s, i) => s + i.total, 0);
             return `<tr>
-          <td>${fmtDate(p.tanggalTransaksi)}</td><td>${pm ? pm.nama : '-'}</td>
+          <td>${fmtDate(p.tanggalTransaksi)}</td><td>${esc(pm ? pm.nama : '-')}</td>
           <td class="right">${rupiah(total)}</td>
           <td>${p.status === 'terkirim' ? '<span class="badge badge-ok">Terkirim</span>' : '<span class="badge badge-warn">Draft</span>'}</td>
           <td class="row-actions">
@@ -2590,11 +2610,11 @@ BB.07.099|Bahan minuman pendamping-lainnya|pcs
     <table class="item-table"><thead><tr><th>Nama Barang</th><th>Kategori</th><th>Harga</th><th>Jumlah</th><th>Satuan</th><th class="right">Total</th><th></th></tr></thead>
     <tbody id="itemsBody">
       ${d.items.map((it, i) => `<tr>
-        <td><input value="${it.namaBarang}" oninput="updItem(${i},'namaBarang',this.value)"></td>
+        <td><input value="${esc(it.namaBarang)}" oninput="updItem(${i},'namaBarang',this.value)"></td>
         <td><input value="${it.kategori}" oninput="updItem(${i},'kategori',this.value)"></td>
         <td><input type="number" value="${it.harga}" oninput="updItem(${i},'harga',this.value)"></td>
         <td><input type="number" value="${it.jumlah}" oninput="updItem(${i},'jumlah',this.value)"></td>
-        <td><input value="${it.satuan}" oninput="updItem(${i},'satuan',this.value)"></td>
+        <td><input value="${esc(it.satuan)}" oninput="updItem(${i},'satuan',this.value)"></td>
         <td class="right" id="itemTotal${i}">${rupiah(it.total)}</td>
         <td><button class="link-btn" onclick="removeItem(${i})">✕</button></td>
       </tr>`).join('')}
@@ -2717,8 +2737,8 @@ BB.07.099|Bahan minuman pendamping-lainnya|pcs
     <h2>Siap disalin ke SIPGN → Pembelian Langsung</h2>
     <div class="copybox">Tanggal Transaksi : ${fmtDate(d.tanggalTransaksi)}
 Tanggal Diterima  : ${fmtDate(d.tanggalDiterima)}
-Nama Pemasok      : ${pm ? pm.nama : '-'}${pm && pm.kontak ? ' (' + pm.kontak + ')' : ''}
-${d.items.map(i => `- ${i.namaBarang} | Kategori: ${i.kategori || '-'} | Harga: ${rupiah(i.harga)} | Jumlah: ${i.jumlah} ${i.satuan} | Total: ${rupiah(i.total)}`).join('\n')}
+Nama Pemasok      : ${esc(pm ? pm.nama : '-')}${esc(pm && pm.kontak ? ' (' + pm.kontak + ')' : '')}
+${d.items.map(i => `- ${esc(i.namaBarang)} | Kategori: ${i.kategori || '-'} | Harga: ${rupiah(i.harga)} | Jumlah: ${i.jumlah} ${esc(i.satuan)} | Total: ${rupiah(i.total)}`).join('\n')}
 Subtotal Barang   : ${rupiah(total)}${biayaAdmin > 0 ? `
 Biaya Admin Bank/Layanan : ${rupiah(biayaAdmin)}
 Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
@@ -2774,7 +2794,7 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
     <h2>Daftar Batch Pembayaran</h2>
     ${batchList.length === 0 ? '<div class="empty">Belum ada batch pembayaran.</div>' : `
     <table><thead><tr><th>Jatuh Tempo</th><th>Jenis</th><th>Penerima</th><th class="right">Jumlah</th><th>Status</th></tr></thead>
-    <tbody>${batchList.map(b => `<tr><td>${fmtDate(b.jatuhTempo)}</td><td>${b.jenis === 'upah' ? 'Upah' : 'Vendor'}</td><td>${b.penerima}</td>
+    <tbody>${batchList.map(b => `<tr><td>${fmtDate(b.jatuhTempo)}</td><td>${b.jenis === 'upah' ? 'Upah' : 'Vendor'}</td><td>${esc(b.penerima)}</td>
       <td class="right">${rupiah(b.jumlah)}</td>
       <td>${b.status === 'approved' ? '<span class="badge badge-ok">Disetujui & Tercatat</span>' : b.status === 'ditolak' ? '<span class="badge badge-bad">Ditolak</span>' : '<span class="badge badge-warn">Menunggu</span>'}</td>
       </tr>`).join('')}</tbody></table>`}
@@ -2825,7 +2845,7 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
       <th>Nama</th><th>Departemen</th><th>Pekerjaan</th><th class="right">Hari</th><th class="right">Upah</th><th class="right">BPJS</th><th class="right">Honor PJ</th><th class="right">Total</th><th></th></tr></thead>
     <tbody>${rows.map(n => `<tr>
       <td class="center"><input type="checkbox" ${nominatifSelected.has(n.id) ? 'checked' : ''} onchange="toggleNominatifSelect('${n.id}')" title="Sertakan di pembukuan"></td>
-      <td>${n.nama}</td><td>${n.departemen || '-'}</td><td>${n.pekerjaan}</td><td class="right">${n.hari}</td>
+      <td>${esc(n.nama)}</td><td>${esc(n.departemen || '-')}</td><td>${esc(n.pekerjaan)}</td><td class="right">${n.hari}</td>
       <td class="right">${rupiah(n.upah)}</td><td class="right">${rupiah(n.bpjs)}</td><td class="right">${rupiah(n.honorPJ)}</td>
       <td class="right"><b>${rupiah(n.grandTotal)}</b></td>
       <td><button class="link-btn" onclick="delNominatif('${n.id}')">hapus</button></td></tr>`).join('')}
@@ -3267,7 +3287,7 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
             await requestWorkbook({
                 filename: `Slip_Gaji_${safeName}.xlsx`, workers: [worker], dayCount, periodeLabel: label,
             });
-            toast(`Slip gaji ${worker.nama} berhasil diunduh`);
+            toast(`Slip gaji ${esc(worker.nama)} berhasil diunduh`);
         } catch (error) {
             toast(error.message || 'Koneksi ke server gagal, slip tidak dapat dibuat');
         } finally {
@@ -3372,7 +3392,7 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
         <th>Nama</th><th>Departemen</th><th>Pekerjaan</th><th class="right">Hari</th><th class="right">Total</th><th></th></tr></thead>
       <tbody>${rows.map(n => `<tr>
         <td class="center"><input type="checkbox" ${nominatifSelected.has(n.id) ? 'checked' : ''} onchange="toggleNominatifSelect('${n.id}')"></td>
-        <td>${n.nama}</td><td>${n.departemen || '-'}</td><td>${n.pekerjaan}</td><td class="right">${n.hari}</td>
+        <td>${esc(n.nama)}</td><td>${esc(n.departemen || '-')}</td><td>${esc(n.pekerjaan)}</td><td class="right">${n.hari}</td>
         <td class="right"><b>${rupiah(n.grandTotal)}</b></td>
         <td class="right"><button class="btn btn-outline btn-sm" ${slipExportId ? 'disabled' : ''} onclick="downloadSlipGaji('${n.id}')">
           ${slipExportId === n.id ? 'Membuat…' : 'Unduh Slip Gaji'}
@@ -3396,7 +3416,7 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
     <h2>Buku Kas Umum (BKU)</h2>
     ${rows.length === 0 ? '<div class="empty">Belum ada data.</div>' : `
     <table><thead><tr><th>Tanggal</th><th>No Bukti</th><th>Uraian</th><th class="right">Debit</th><th class="right">Kredit</th><th class="right">Saldo</th></tr></thead>
-    <tbody>${rows.map(r => `<tr><td>${fmtDate(r.tanggal)}</td><td>${r.noBukti || '-'}</td><td>${r.uraian}</td>
+    <tbody>${rows.map(r => `<tr><td>${fmtDate(r.tanggal)}</td><td>${esc(r.noBukti || '-')}</td><td>${esc(r.uraian)}</td>
       <td class="right">${r.d ? rupiah(r.d) : '-'}</td><td class="right">${r.k ? rupiah(r.k) : '-'}</td><td class="right"><b>${rupiah(r.saldo)}</b></td></tr>`).join('')}
     </tbody></table>`}
   </div>`;
@@ -3406,10 +3426,10 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
         return kasAccounts.map(ka => {
             const rows = dalamPeriodeBuku(ledgerForKas(ka.kode));
             return `<div class="card">
-      <h2>BP Kas — ${ka.nama}</h2>
+      <h2>BP Kas — ${esc(ka.nama)}</h2>
       ${rows.length === 0 ? '<div class="empty">Belum ada data.</div>' : `
       <table><thead><tr><th>Tanggal</th><th>No Bukti</th><th>Uraian</th><th class="right">Debit</th><th class="right">Kredit</th><th class="right">Saldo</th></tr></thead>
-      <tbody>${rows.map(r => `<tr><td>${fmtDate(r.tanggal)}</td><td>${r.noBukti || '-'}</td><td>${r.uraian}</td>
+      <tbody>${rows.map(r => `<tr><td>${fmtDate(r.tanggal)}</td><td>${esc(r.noBukti || '-')}</td><td>${esc(r.uraian)}</td>
         <td class="right">${r.d ? rupiah(r.d) : '-'}</td><td class="right">${r.k ? rupiah(r.k) : '-'}</td><td class="right"><b>${rupiah(r.saldo)}</b></td></tr>`).join('')}
       </tbody></table>`}
     </div>`;
@@ -3422,7 +3442,7 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
     
     ${rows.length === 0 ? '<div class="empty">Belum ada data.</div>' : `
     <table><thead><tr><th>Tanggal</th><th>Uraian</th><th class="right">Dana Masuk</th><th class="right">Biaya</th><th class="right">Saldo</th></tr></thead>
-    <tbody>${rows.map(r => `<tr><td>${fmtDate(r.tanggal)}</td><td>${r.uraian}</td>
+    <tbody>${rows.map(r => `<tr><td>${fmtDate(r.tanggal)}</td><td>${esc(r.uraian)}</td>
       <td class="right">${r.masuk ? rupiah(r.masuk) : '-'}</td><td class="right">${r.keluar ? rupiah(r.keluar) : '-'}</td><td class="right"><b>${rupiah(r.saldo)}</b></td></tr>`).join('')}
     </tbody></table>`}
   </div>`;
@@ -3436,7 +3456,7 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
     <h2>Buku Pembantu — Pajak</h2>
     ${rows.length === 0 ? '<div class="empty">Belum ada data pajak.</div>' : `
     <table><thead><tr><th>Tanggal</th><th>Jenis Pajak</th><th>Uraian</th><th class="right">Jumlah</th></tr></thead>
-    <tbody>${rows.map(r => `<tr><td>${fmtDate(r.tanggal)}</td><td>${coaByKode(r.akunLawan)?.nama}</td><td>${r.uraian}</td><td class="right">${rupiah(r.jumlah)}</td></tr>`).join('')}
+    <tbody>${rows.map(r => `<tr><td>${fmtDate(r.tanggal)}</td><td>${esc(coaByKode(r.akunLawan)?.nama)}</td><td>${esc(r.uraian)}</td><td class="right">${rupiah(r.jumlah)}</td></tr>`).join('')}
     </tbody></table>
     <hr class="sep">
     <b>Total per jenis:</b>
@@ -3450,7 +3470,7 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
     <h2>Catatan Pengeluaran</h2>
     ${rows.length === 0 ? '<div class="empty">Belum ada pengeluaran.</div>' : `
     <table><thead><tr><th>Tanggal</th><th>Uraian</th><th>Kategori</th><th class="right">Jumlah</th></tr></thead>
-    <tbody>${rows.map(r => `<tr><td>${fmtDate(r.tanggal)}</td><td>${r.uraian}</td><td>${coaByKode(r.akunLawan)?.kategori || '-'}</td><td class="right">${rupiah(r.jumlah)}</td></tr>`).join('')}
+    <tbody>${rows.map(r => `<tr><td>${fmtDate(r.tanggal)}</td><td>${esc(r.uraian)}</td><td>${coaByKode(r.akunLawan)?.kategori || '-'}</td><td class="right">${rupiah(r.jumlah)}</td></tr>`).join('')}
     </tbody></table>`}
   </div>`;
     }
@@ -3473,7 +3493,7 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
 
         return `
   <div class="card">
-    <h2>Laporan Penggunaan Anggaran (LPA) — ${a.periode || '(periode belum diisi)'}</h2>
+    <h2>Laporan Penggunaan Anggaran (LPA) — ${esc(a.periode || '(periode belum diisi)')}</h2>
     <table><thead><tr><th>Kategori</th><th class="right">Anggaran</th><th class="right">Realisasi</th><th class="right">Sisa</th></tr></thead>
     <tbody>
       <tr><td>Bahan Makanan</td><td class="right">${rupiah(a.bahanMakanan)}</td><td class="right">${rupiah(biayaBahan)}</td><td class="right">${rupiah(a.bahanMakanan - biayaBahan)}</td></tr>
@@ -3496,7 +3516,7 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
     <p class="sub">Jumlah jauh di atas rata-rata kategori.</p>
     ${anomali.length === 0 ? '<div class="empty">Tidak ada anomali terdeteksi.</div>' : `
     <table><thead><tr><th>Tanggal</th><th>Uraian</th><th>Kategori</th><th class="right">Jumlah</th><th class="right">Rata-rata Kategori</th></tr></thead>
-    <tbody>${anomali.map(r => `<tr><td>${fmtDate(r.tanggal)}</td><td>${r.uraian}</td><td>${r.kategori}</td>
+    <tbody>${anomali.map(r => `<tr><td>${fmtDate(r.tanggal)}</td><td>${esc(r.uraian)}</td><td>${r.kategori}</td>
       <td class="right"><span class="badge badge-warn">${rupiah(r.jumlah)}</span></td><td class="right">${rupiah(Math.round(r.rata))}</td></tr>`).join('')}
     </tbody></table>`}
   </div>
@@ -3513,9 +3533,9 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
     <h2>Dokumen Pendukung</h2>
     <p class="sub">Draf teks, salin ke template resmi.</p>
     <div class="copybox">SURAT PERNYATAAN TANGGUNG JAWAB (draf)
-Periode           : ${a.periode || '-'}
-Nama SPPG         : ${DB.setup.namaSPPG || '-'}
-Kepala SPPG       : ${DB.setup.kepalaSPPG || '-'}
+Periode           : ${esc(a.periode || '-')}
+Nama SPPG         : ${esc(DB.setup.namaSPPG || '-')}
+Kepala SPPG       : ${esc(DB.setup.kepalaSPPG || '-')}
 Total Anggaran    : ${rupiah(totalAnggaran)}
 Total Realisasi   : ${rupiah(totalRealisasi)}
 Sisa Dana         : ${rupiah(totalAnggaran - totalRealisasi)}
