@@ -983,6 +983,320 @@
         { kode: '2195', nama: 'Biaya Admin Bank/Layanan', kategori: 'Biaya Administrasi' },
     ];
 
+    // Katalog barang persediaan bawaan MASTER_4: 6 kelompok, 27 sub-kelompok, dan
+    // 271 item. Setiap akun baru mendapat daftar ini, dan pengguna bisa menambah
+    // item sendiri lewat Referensi Barang. Disimpan sebagai teks "kode|nama|satuan"
+    // agar mudah dibaca dan tidak membengkakkan berkas.
+    const DEFAULT_BARANG = `
+KH|KARBOHIDRAT|
+KH.01|BERAS DAN OLAHAN PADI|
+KH.01.001|Beras putih (premium)|kg
+KH.01.002|Beras putih (medium)|kg
+KH.01.003|Beras merah|kg
+KH.01.004|Beras hitam|kg
+KH.01.005|Beras ketan putih|kg
+KH.01.006|Beras ketan hitam|kg
+KH.01.007|Tepung beras|kg
+KH.01.008|Tepung ketan|kg
+KH.01.009|Mie beras|kg
+KH.01.099|Beras dan olahan padi-lainnya|kg
+KH.02|JAGUNG DAN OLAHANNYA|
+KH.02.001|Jagung pipil kering|kg
+KH.02.002|Jagung pipil segar|kg
+KH.02.003|Jagung manis segar|kg
+KH.02.004|Beras jagung|kg
+KH.02.005|Jagung giling|kg
+KH.02.006|Tepung jagung (maizena)|kg
+KH.02.007|Tepung jagung lokal (cornmeal)|kg
+KH.02.099|Jagung dan olahan-lainnya|kg
+KH.03|UMBI-UMBIAN|
+KH.03.001|Singkong segar|kg
+KH.03.002|Singkong kering/gaplek|kg
+KH.03.003|Tepung singkong (tapioka)|kg
+KH.03.004|Mocaf|kg
+KH.03.005|Ubi jalar putih|kg
+KH.03.006|Ubi jalar kuning/oranye|kg
+KH.03.007|Ubi jalar ungu|kg
+KH.03.008|Kentang|kg
+KH.03.009|Talas|kg
+KH.03.010|Ganyong|kg
+KH.03.011|Sagu basah|kg
+KH.03.012|Tepung sagu|kg
+KH.03.099|Umbi umbian-lainnya|kg
+KH.04|GANDUM DAN OLAHAN TEPUNG|
+KH.04.001|Tepung terigu protein rendah|kg
+KH.04.002|Tepung terigu protein sedang|kg
+KH.04.003|Tepung terigu protein tinggi|kg
+KH.04.004|Tepung semolina|kg
+KH.04.005|Mie kering (non-instan)|pak
+KH.04.006|Spageti|pak
+KH.04.007|Makaroni|pak
+KH.04.008|Roti tawar|pak
+KH.04.009|Roti gandum|pak
+KH.04.010|Tepung panir|pak
+KH.04.011|Biskuit|pak
+KH.04.012|Bubur bayi|pak
+KH.04.099|Gandum dan olahan tepung-lainnya|pak
+KH.05|SEREAL|
+KH.05.001|Oat (rolled oats)|kg
+KH.05.002|Oat instan|kg
+KH.05.003|Sorgum biji|kg
+KH.05.004|Tepung sorgum|kg
+KH.05.005|Millet/jewawut biji|kg
+KH.05.006|Tepung millet|kg
+KH.05.099|Sereal-lainnya|kg
+PH|PROTEIN HEWANI|
+PH.01|UNGGAS DAN OLAHANNYA|
+PH.01.001|Ayam broiler utuh|kg
+PH.01.002|Fillet dada ayam|kg
+PH.01.003|Paha ayam atas|kg
+PH.01.004|Paha ayam bawah (drumstick)|kg
+PH.01.005|Sayap ayam|kg
+PH.01.006|Hati ayam|kg
+PH.01.007|Ampela ayam|kg
+PH.01.008|Telur ayam ras/negeri|kg
+PH.01.009|Telur ayam kampung|kg
+PH.01.010|Telur puyuh|kg
+PH.01.011|Sosis ayam|pak
+PH.01.099|Ayam dan olahannya-lainnya|kg
+PH.02|DAGING SAPI/KERBAU/KAMBING|
+PH.02.001|Daging sapi segar (has luar/sirloin)|kg
+PH.02.002|Daging sapi segar (has dalam/tenderloin)|kg
+PH.02.003|Daging sapi segar (sandung lamur/brisket)|kg
+PH.02.004|Daging sapi segar (paha)|kg
+PH.02.005|Daging sapi giling|kg
+PH.02.006|Hati sapi|kg
+PH.02.007|Iga sapi|kg
+PH.02.008|Daging kerbau segar|kg
+PH.02.009|Daging kambing segar|kg
+PH.02.010|Daging domba segar|kg
+PH.02.011|Hati kambing|kg
+PH.02.012|Sosis sapi|pak
+PH.02.099|Daging sapi/kerbau/kambing-lainnya|kg
+PH.03|IKAN AIR TAWAR|
+PH.03.001|Lele|kg
+PH.03.002|Nila|kg
+PH.03.003|Mujair|kg
+PH.03.004|Patin|kg
+PH.03.005|Gurame|kg
+PH.03.006|Mas|kg
+PH.03.007|Gabus|kg
+PH.03.008|Fillet ikan tawar|kg
+PH.03.099|Ikan air tawar-lainnya|kg
+PH.04|IKAN LAUT|
+PH.04.001|Kembung|kg
+PH.04.002|Tongkol|kg
+PH.04.003|Cakalang|kg
+PH.04.004|Tuna|kg
+PH.04.005|Sarden/lemuru|kg
+PH.04.006|Bandeng|kg
+PH.04.007|Tenggiri|kg
+PH.04.008|Kakap|kg
+PH.04.009|Fillet ikan laut|kg
+PH.04.010|Ikan laut-lainnya|kg
+PH.05|PRODUK PERIKANAN LAIN|
+PH.05.001|Udang segar|kg
+PH.05.002|Udang beku|kg
+PH.05.003|Cumi-cumi|kg
+PH.05.004|Sotong|kg
+PH.05.005|Kepiting/rajungan|kg
+PH.05.006|Kerang hijau|kg
+PH.05.007|Kerang dara|kg
+PH.05.099|Produk perikanan lain-lainnya|kg
+PH.06|SUSU DAN OLAHANNYA|
+PH.06.001|Susu UHT full cream|liter
+PH.06.002|Susu UHT rendah lemak|liter
+PH.06.003|Susu pasteurisasi|liter
+PH.06.004|Susu bubuk|kg
+PH.06.005|Yogurt plain|pak
+PH.06.006|Keju cheddar|pak
+PH.06.007|Keju olahan (slice)|pak
+PH.06.099|Susu dan olahan-lainnya|liter
+PN|PROTEIN NABATI|
+PN.01|KEDELAI DAN OLAHANNYA|
+PN.01.001|Kedelai biji kering|kg
+PN.01.002|Tempe|kg
+PN.01.003|Tahu putih|kg
+PN.01.004|Tahu kuning|kg
+PN.01.005|Tahu sutra|kg
+PN.01.006|Susu kedelai|liter
+PN.01.007|Tepung kedelai|kg
+PN.01.099|Kedelai dan olahannya-lainnya|kg
+PN.02|KACANG-KACANGAN|
+PN.02.001|Kacang tanah kupas|kg
+PN.02.002|Kacang tanah dengan kulit|kg
+PN.02.003|Kacang hijau|kg
+PN.02.004|Kacang merah|kg
+PN.02.005|Kacang tolo/tunggak|kg
+PN.02.006|Kacang hitam|kg
+PN.02.007|Kacang arab/chickpea|kg
+PN.02.008|Kacang polong/pea|kg
+PN.02.009|Kacang mede|kg
+PN.02.010|Kacang almond|kg
+PN.02.099|Kacang kacangan-lainnya|kg
+PN.03|BIJI-BIJIAN DAN PRODUKNYA|
+PN.03.001|Wijen|kg
+PN.03.002|Biji bunga matahari|kg
+PN.03.003|Chia seed|kg
+PN.03.004|Flaxseed|kg
+PN.03.099|Biji-bijian dan produknya-lainnya|kg
+SY|SAYURAN|
+SY.01|SAYURAN DAUN/BATANG/BUNGA|
+SY.01.001|Bayam|ikat
+SY.01.002|Kangkung|ikat
+SY.01.003|Sawi hijau|ikat
+SY.01.004|Sawi putih|ikat
+SY.01.005|Pakcoy|ikat
+SY.01.006|Selada|ikat
+SY.01.007|Daun singkong|ikat
+SY.01.008|Daun pepaya|ikat
+SY.01.009|Kelor|ikat
+SY.01.010|Katuk|ikat
+SY.01.011|Seledri daun|ikat
+SY.01.012|Brokoli|kg
+SY.01.013|Kembang kol|kg
+SY.01.014|Buncis|kg
+SY.01.015|Seledri batang|ikat
+SY.01.016|Asparagus|ikat
+SY.01.099|Sayuran daun/batang/bunga-lainnya|ikat
+SY.02|SAYURAN BUAH/UMBI/AKAR|
+SY.02.001|Tomat|kg
+SY.02.002|Mentimun|kg
+SY.02.003|Terong ungu|kg
+SY.02.004|Terong hijau|kg
+SY.02.005|Cabai merah besar|kg
+SY.02.006|Cabai rawit|kg
+SY.02.007|Labu siam|kg
+SY.02.008|Pare|kg
+SY.02.009|Paprika|kg
+SY.02.010|Okra|kg
+SY.02.011|Wortel|kg
+SY.02.012|Lobak putih|kg
+SY.02.013|Bit|kg
+SY.02.099|Sayuran buah/umbi/akar-lainnya|kg
+SY.03|SAYURAN BAWANG DAN AROMATIK|
+SY.03.001|Bawang merah|kg
+SY.03.002|Bawang putih|kg
+SY.03.003|Bawang bombai|kg
+SY.03.004|Daun bawang|kg
+SY.03.005|Bawang prei|kg
+SY.03.006|Jahe|kg
+SY.03.007|Kunyit|kg
+SY.03.008|Lengkuas|kg
+SY.03.009|Kencur|kg
+SY.03.010|Serai|kg
+SY.03.011|Temu kunci|kg
+SY.03.012|Kemiri|kg
+SY.03.099|Sayuran bawang dan aromatik lainnya|kg
+SY.04|JAMUR|
+SY.04.001|Jamur tiram|kg
+SY.04.002|Jamur kancing|kg
+SY.04.003|Jamur kuping|kg
+SY.04.004|Jamur shiitake|kg
+SY.04.099|Jamur-lainnya|kg
+BU|BUAH-BUAHAN|
+BU.01|BUAH LOKAL|
+BU.01.001|Pisang ambon|kg
+BU.01.002|Pisang kepok|kg
+BU.01.003|Pisang raja|kg
+BU.01.004|Pepaya|kg
+BU.01.005|Semangka|kg
+BU.01.006|Melon|kg
+BU.01.007|Mangga harum manis|kg
+BU.01.008|Mangga gedong|kg
+BU.01.009|Jeruk manis|kg
+BU.01.010|Jeruk keprok|kg
+BU.01.011|Jambu biji|kg
+BU.01.012|Jambu air|kg
+BU.01.013|Nanas|kg
+BU.01.014|Salak|kg
+BU.01.015|Rambutan|kg
+BU.01.016|Duku|kg
+BU.01.017|Sirsak|kg
+BU.01.018|Durian|kg
+BU.01.019|Manggis|kg
+BU.01.020|Alpukat|kg
+BU.01.021|Apel malang|kg
+BU.01.022|Buah naga merah|kg
+BU.01.023|Buah naga putih|kg
+BU.01.024|Kedondong|kg
+BU.01.025|Markisa|kg
+BU.01.026|Belimbing|kg
+BU.01.027|Sawo|kg
+BU.01.028|Matoa|kg
+BU.01.099|Buah lokal-lainnya|kg
+BU.02|BUAH IMPOR|
+BU.02.001|Apel|kg
+BU.02.002|Pear|kg
+BU.02.003|Anggur merah|kg
+BU.02.004|Anggur hijau|kg
+BU.02.005|Kiwi|kg
+BU.02.099|Buah impor-lainnya|kg
+BB|BAHAN BAKU LAIN|
+BB.01|MINYAK DAN LEMAK|
+BB.01.001|Minyak goreng sawit|liter
+BB.01.002|Minyak goreng campuran|liter
+BB.01.003|Minyak kelapa|liter
+BB.01.004|Margarin|kg
+BB.01.005|Mentega (butter)|kg
+BB.01.099|Minyak dan lemak-lainnya|kg
+BB.02|GARAM, GULA, DAN PEMANIS|
+BB.02.001|Garam beryodium|pak
+BB.02.002|Gula pasir|kg
+BB.02.003|Gula merah/aren|kg
+BB.02.004|Madu|kg
+BB.02.099|Garam, gula, dan pemanis-lainnya|kg
+BB.03|BUMBU KERING (REMPAH)|
+BB.03.001|Lada/merica bubuk|pcs
+BB.03.002|Ketumbar bubuk|pcs
+BB.03.003|Jinten bubuk|pcs
+BB.03.004|Pala bubuk|pcs
+BB.03.005|Kayu manis|pcs
+BB.03.006|Cengkeh|pcs
+BB.03.007|Kapulaga|pcs
+BB.03.008|Daun salam kering|pcs
+BB.03.009|Oregano|pcs
+BB.03.099|Bumbu kering (rempah)-lainnya|pcs
+BB.04|BUMBU CAIR, SAUS, DAN KONDIMEN|
+BB.04.001|Kecap manis|botol
+BB.04.002|Kecap asin|botol
+BB.04.003|Saus sambal|botol
+BB.04.004|Saus tomat|botol
+BB.04.005|Saus tiram|botol
+BB.04.006|Cuka makan|botol
+BB.04.007|Mayones|botol
+BB.04.099|Bumbu cair, saus, dan kondimen-lainnya|botol
+BB.05|PRODUK OLAHAN DASAR|
+BB.05.001|Santan segar|pcs
+BB.05.002|Santan instan cair|pcs
+BB.05.003|Santan bubuk|pcs
+BB.05.004|Kaldu bubuk ayam|pcs
+BB.05.005|Kaldu bubuk sapi|pcs
+BB.05.006|Kaldu jamur|pcs
+BB.05.007|Agar-agar bubuk|pcs
+BB.05.008|Gelatin|pcs
+BB.05.099|Produk olahan dasar-lainnya|pcs
+BB.06|BAHAN FERMENTASI/PELENGKAP|
+BB.06.001|Terasi|pcs
+BB.06.002|Tauco|pcs
+BB.06.003|Ragi roti|pcs
+BB.06.004|Baking powder|pcs
+BB.06.099|Bahan fermentasi/pelengkap-lainnya|pcs
+BB.07|BAHAN MINUMAN PENDAMPING|
+BB.07.001|Air minum kemasan galon|pcs
+BB.07.002|Air minum kemasan botol 2 liter|dus
+BB.07.003|Air minum kemasan botol 1,5 liter|dus
+BB.07.004|Air minum kemasan botol 600 ml|dus
+BB.07.005|Air minum kemasan botol 330 ml|dus
+BB.07.006|Air minum kemasan cup|dus
+BB.07.007|Minuman kemasan botol/kaleng|pcs
+BB.07.008|Susu kental manis|pcs
+BB.07.099|Bahan minuman pendamping-lainnya|pcs
+`.trim().split('\n').map(baris => {
+        const [kode, nama, satuan] = baris.split('|');
+        return { kode, nama, satuan, level: kode.split('.').length };
+    });
+
     const JENIS_PEKERJAAN = [
         { label: 'Pencuci Alat Makan', tarif: 200000 },
         { label: 'Asisten Lapangan', tarif: 100000 },
@@ -1006,6 +1320,7 @@
                 reviewed: false, reviewedBy: '', reviewedAt: ''
             },
             coa: DEFAULT_COA.slice(),
+            barang: DEFAULT_BARANG.slice(),
             pemasok: [],
             transaksi: [],
             pembelian: [],
@@ -1032,6 +1347,9 @@
     let editingPembelianId = null;
     let ocrBusy = false;
     let nominatifFilterDept = 'Semua';
+    let cariBarang = '';
+    // Data yang gagal tersimpan ke server; ditampilkan sampai penyimpanan berhasil.
+    const gagalSimpan = new Set();
     let nominatifSelected = new Set();
     let nominatifExportBusy = false;
     let biweeklyExportBusy = false;
@@ -1041,7 +1359,7 @@
 
     // ---------- storage helpers (per-user rows in Supabase, isolated by RLS) ----------
     async function loadAll() {
-        const keys = ['setup', 'coa', 'pemasok', 'transaksi', 'pembelian', 'anggaran', 'approvals', 'batch', 'nominatif'];
+        const keys = ['setup', 'coa', 'pemasok', 'transaksi', 'pembelian', 'anggaran', 'approvals', 'batch', 'nominatif', 'barang'];
         DB = defaultDB();
         if (!currentUser) return;
         try {
@@ -1050,6 +1368,10 @@
             (data || []).forEach(row => { if (keys.includes(row.key)) DB[row.key] = row.value; });
         } catch (e) { console.error('load failed', e); }
         if (!DB.coa || DB.coa.length === 0) DB.coa = DEFAULT_COA.slice();
+        // Akun yang dibuat sebelum katalog ini ada tetap mendapatkannya. Sekali
+        // pengguna menyimpan daftarnya sendiri, isian itu yang dipakai — termasuk
+        // bila ia menghapus sebagian item bawaan.
+        if (!DB.barang || DB.barang.length === 0) DB.barang = DEFAULT_BARANG.slice();
         if (DB.setup.approvalThreshold === undefined) DB.setup.approvalThreshold = 500000;
         loadNominatifSelection();
     }
@@ -1060,7 +1382,16 @@
                 user_id: currentUser.id, key, value: DB[key], updated_at: new Date().toISOString()
             });
             if (error) throw error;
-        } catch (e) { console.error('storage save failed', key, e); }
+            if (gagalSimpan.delete(key) && gagalSimpan.size === 0) render();
+        } catch (e) {
+            console.error('storage save failed', key, e);
+            // A silent failure is the worst outcome here: the screen keeps showing
+            // data that never reached the server, and a refresh loses it. Bab 12 of
+            // the panduan tells the operator to stop and check, so say so.
+            gagalSimpan.add(key);
+            toast('Gagal menyimpan ke server. Jangan tutup halaman — periksa koneksi lalu ulangi.');
+            render();
+        }
     }
     // Keeps the "Buku Otomatis" checkbox selection alive across an accidental page refresh.
     function loadNominatifSelection() {
@@ -1148,16 +1479,24 @@
     function triggerManualDailyRefresh() {
         checkAndRunDailyRefresh(true);
     }
+    // Setiap layar dipasang lewat innerHTML, jadi teks apa pun yang berasal dari
+    // pengguna, hasil OCR, atau berkas impor wajib dilewatkan ke sini dulu —
+    // termasuk saat masuk ke dalam atribut seperti value="" atau onclick="".
+    function esc(value) {
+        return String(value === null || value === undefined ? '' : value)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
     function rupiah(n) { n = Number(n) || 0; return 'Rp ' + n.toLocaleString('id-ID'); }
     function fmtDate(d) { if (!d) return '-'; const dt = new Date(d); return dt.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }); }
     function coaByKode(k) { return DB.coa.find(c => c.kode === k); }
     function coaOptions(filterKategori) {
         return DB.coa.filter(c => !filterKategori || filterKategori.includes(c.kategori))
-            .map(c => `<option value="${c.kode}">${c.kode} - ${c.nama}</option>`).join('');
+            .map(c => `<option value="${esc(c.kode)}">${esc(c.kode)} - ${esc(c.nama)}</option>`).join('');
     }
     function pemasokOptions(selId) {
         if (DB.pemasok.length === 0) return '<option value="">(belum ada pemasok)</option>';
-        return DB.pemasok.map(p => `<option value="${p.id}" ${p.id === selId ? 'selected' : ''}>${p.nama}</option>`).join('');
+        return DB.pemasok.map(p => `<option value="${p.id}" ${p.id === selId ? 'selected' : ''}>${esc(p.nama)}</option>`).join('');
     }
     function downloadCSV(filename, headers, rows) {
         let csv = headers.join(';') + '\n';
@@ -1444,16 +1783,17 @@
         if (subEl && titles[activeTab]) subEl.textContent = titles[activeTab].s;
 
         const c = document.getElementById('content');
-        if (activeTab === 'dashboard') c.innerHTML = renderDashboard();
-        else if (activeTab === 'approval') c.innerHTML = renderApproval();
-        else if (activeTab === 'setup') c.innerHTML = renderSetup();
-        else if (activeTab === 'transaksi') c.innerHTML = renderTransaksi();
-        else if (activeTab === 'ocr') c.innerHTML = renderOcr();
-        else if (activeTab === 'sipgn') c.innerHTML = renderSipgn();
-        else if (activeTab === 'kas') c.innerHTML = renderKas();
-        else if (activeTab === 'pajak') c.innerHTML = renderPajak();
-        else if (activeTab === 'buku') c.innerHTML = renderBuku();
-        else if (activeTab === 'laporan') c.innerHTML = renderLaporan();
+        const peringatanSimpan = gagalSimpan.size > 0
+            ? `<div class="note" style="background:#fee2e2;border-color:#ef4444;color:#991b1b;margin-bottom:16px;">
+                 Ada ${gagalSimpan.size} data yang belum tersimpan ke server (${esc([...gagalSimpan].join(', '))}).
+                 Periksa koneksi, lalu simpan ulang sebelum menutup halaman.</div>`
+            : '';
+        const layar = {
+            dashboard: renderDashboard, approval: renderApproval, setup: renderSetup,
+            transaksi: renderTransaksi, ocr: renderOcr, sipgn: renderSipgn,
+            kas: renderKas, pajak: renderPajak, buku: renderBuku, laporan: renderLaporan,
+        }[activeTab];
+        if (layar) c.innerHTML = peringatanSimpan + layar();
     }
     function setTab(id) {
         activeTab = id; draftPembelian = null; render();
@@ -1502,7 +1842,7 @@
             <div class="hero-title">Aktivitas SCM &amp; Keuangan</div>
             <div class="hero-val">${jmlTransaksi} Transaksi Total</div>
           </div>
-          <span class="hero-badge-pill">Periode ${DB.anggaran.periode || getCurrentPeriodName()}</span>
+          <span class="hero-badge-pill">Periode ${esc(DB.anggaran.periode || getCurrentPeriodName())}</span>
         </div>
         <div style="margin: 14px 0 6px 0; font-size: 12px; opacity: 0.9; line-height: 1.6;">
           Statistik pengadaan bahan baku, transaksi operasional &amp; sinkronisasi laporan otomatis SPPG.
@@ -1556,8 +1896,8 @@
                   ${t.tipe === 'D' ? '📥' : '🛒'}
                 </div>
                 <div style="flex:1;">
-                  <div style="font-weight:700; font-size:13.5px; color:#0f172a;">${t.uraian}</div>
-                  <div style="font-size:11.5px; color:#64748b;">${fmtDate(t.tanggal)} · ${coaByKode(t.akunKas)?.nama || t.akunKas}</div>
+                  <div style="font-weight:700; font-size:13.5px; color:#0f172a;">${esc(t.uraian)}</div>
+                  <div style="font-size:11.5px; color:#64748b;">${fmtDate(t.tanggal)} · ${esc(coaByKode(t.akunKas)?.nama || t.akunKas)}</div>
                 </div>
                 <div style="font-weight:800; font-size:13.5px; color:${t.tipe === 'D' ? '#16a34a' : '#0f172a'};">
                   ${t.tipe === 'D' ? '+' : '-'}${rupiah(t.jumlah)}
@@ -1619,7 +1959,7 @@
       <div class="approval-row">
         <div>
           <span class="badge badge-warn">${typeLabel[a.type] || a.type}</span>
-          <b style="margin-left:6px;">${a.deskripsi}</b>
+          <b style="margin-left:6px;">${esc(a.deskripsi)}</b>
           <div class="small muted">${fmtDate(a.tanggal)} ${a.jumlah ? '· ' + rupiah(a.jumlah) : ''}</div>
         </div>
         <div class="row-actions">
@@ -1632,7 +1972,7 @@
     <h2>Riwayat Keputusan</h2>
     ${hist.length === 0 ? '<div class="empty">Belum ada riwayat.</div>' : `
     <table><thead><tr><th>Tanggal</th><th>Jenis</th><th>Deskripsi</th><th class="right">Jumlah</th><th>Status</th></tr></thead>
-    <tbody>${hist.map(a => `<tr><td>${fmtDate(a.tanggal)}</td><td>${typeLabel[a.type] || a.type}</td><td>${a.deskripsi}</td>
+    <tbody>${hist.map(a => `<tr><td>${fmtDate(a.tanggal)}</td><td>${typeLabel[a.type] || a.type}</td><td>${esc(a.deskripsi)}</td>
       <td class="right">${a.jumlah ? rupiah(a.jumlah) : '-'}</td>
       <td>${a.status === 'approved' ? '<span class="badge badge-ok">Disetujui</span>' : '<span class="badge badge-bad">Ditolak</span>'}</td></tr>`).join('')}
     </tbody></table>`}
@@ -1647,14 +1987,14 @@
   <div class="card">
     <h2>Profil SPPG</h2>
         <div class="grid c2">
-      <div class="field"><label>Nama SPPG</label><input id="f_namaSPPG" value="${s.namaSPPG || ''}"></div>
-      <div class="field"><label>ID SPPG</label><input id="f_idSPPG" value="${s.idSPPG || ''}" placeholder="Kode SPPG pada dokumen resmi"></div>
-      <div class="field"><label>Nama Yayasan / Lembaga</label><input id="f_namaYayasan" value="${s.namaYayasan || ''}"></div>
-      <div class="field"><label>Ketua Yayasan / Yang Mewakili</label><input id="f_ketuaYayasan" value="${s.ketuaYayasan || ''}"></div>
-      <div class="field"><label>Nama Kepala SPPG</label><input id="f_kepalaSPPG" value="${s.kepalaSPPG || ''}"></div>
-      <div class="field"><label>Nama Akuntan / PLOK</label><input id="f_akuntan" value="${s.akuntan || ''}"></div>
-      <div class="field"><label>Nomor Rekening / VA</label><input id="f_rekening" value="${s.rekening || ''}"></div>
-      <div class="field"><label>Alamat</label><input id="f_alamat" value="${s.alamat || ''}"></div>
+      <div class="field"><label>Nama SPPG</label><input id="f_namaSPPG" value="${esc(s.namaSPPG || '')}"></div>
+      <div class="field"><label>ID SPPG</label><input id="f_idSPPG" value="${esc(s.idSPPG || '')}" placeholder="Kode SPPG pada dokumen resmi"></div>
+      <div class="field"><label>Nama Yayasan / Lembaga</label><input id="f_namaYayasan" value="${esc(s.namaYayasan || '')}"></div>
+      <div class="field"><label>Ketua Yayasan / Yang Mewakili</label><input id="f_ketuaYayasan" value="${esc(s.ketuaYayasan || '')}"></div>
+      <div class="field"><label>Nama Kepala SPPG</label><input id="f_kepalaSPPG" value="${esc(s.kepalaSPPG || '')}"></div>
+      <div class="field"><label>Nama Akuntan / PLOK</label><input id="f_akuntan" value="${esc(s.akuntan || '')}"></div>
+      <div class="field"><label>Nomor Rekening / VA</label><input id="f_rekening" value="${esc(s.rekening || '')}"></div>
+      <div class="field"><label>Alamat</label><input id="f_alamat" value="${esc(s.alamat || '')}"></div>
     </div>
     <button class="btn btn-primary" onclick="saveSetup()">Simpan Profil</button>
   </div>
@@ -1663,11 +2003,11 @@
     <h2>Data Pelaporan</h2>
     <p class="sub" style="margin-top:-4px;">Dicetak pada surat LPA, SPTJ, dan Berita Acara Sisa Dana di Buku Otomatis. Boleh dikosongkan bila belum ada nomornya.</p>
     <div class="grid c3">
-      <div class="field"><label>Tahun Anggaran</label><input id="f_tahunAnggaran" value="${s.tahunAnggaran || ''}" placeholder="cth: 2026"></div>
-      <div class="field"><label>Tempat Pelaporan</label><input id="f_tempatPelaporan" value="${s.tempatPelaporan || ''}" placeholder="cth: Bandung"></div>
-      <div class="field"><label>Tanggal Pelaporan</label><input id="f_tanggalPelaporan" value="${s.tanggalPelaporan || ''}" placeholder="cth: 31 Agustus 2026"></div>
-      <div class="field"><label>Nomor LPA</label><input id="f_nomorLPA" value="${s.nomorLPA || ''}"></div>
-      <div class="field"><label>Nomor Berita Acara Sisa Dana</label><input id="f_nomorBAPSD" value="${s.nomorBAPSD || ''}"></div>
+      <div class="field"><label>Tahun Anggaran</label><input id="f_tahunAnggaran" value="${esc(s.tahunAnggaran || '')}" placeholder="cth: 2026"></div>
+      <div class="field"><label>Tempat Pelaporan</label><input id="f_tempatPelaporan" value="${esc(s.tempatPelaporan || '')}" placeholder="cth: Bandung"></div>
+      <div class="field"><label>Tanggal Pelaporan</label><input id="f_tanggalPelaporan" value="${esc(s.tanggalPelaporan || '')}" placeholder="cth: 31 Agustus 2026"></div>
+      <div class="field"><label>Nomor LPA</label><input id="f_nomorLPA" value="${esc(s.nomorLPA || '')}"></div>
+      <div class="field"><label>Nomor Berita Acara Sisa Dana</label><input id="f_nomorBAPSD" value="${esc(s.nomorBAPSD || '')}"></div>
     </div>
     <button class="btn btn-primary" onclick="saveSetup()">Simpan Data Pelaporan</button>
   </div>
@@ -1676,8 +2016,8 @@
     <h2>Ambang Approval &amp; Periode</h2>
         <div class="grid c3">
       <div class="field"><label>Ambang Approval (Rp)</label><input id="f_threshold" type="number" value="${s.approvalThreshold || 0}"></div>
-      <div class="field"><label>Periode Mulai</label><input id="f_periodeMulai" type="date" value="${s.periodeMulai || ''}"></div>
-      <div class="field"><label>Periode Selesai</label><input id="f_periodeSelesai" type="date" value="${s.periodeSelesai || ''}"></div>
+      <div class="field"><label>Periode Mulai</label><input id="f_periodeMulai" type="date" value="${esc(s.periodeMulai || '')}"></div>
+      <div class="field"><label>Periode Selesai</label><input id="f_periodeSelesai" type="date" value="${esc(s.periodeSelesai || '')}"></div>
     </div>
     <button class="btn btn-primary" onclick="saveSetup()">Simpan</button>
   </div>
@@ -1685,9 +2025,9 @@
   <div class="card">
     <h2>Anggaran Periode Berjalan</h2>
     <div class="grid c3">
-      <div class="field"><label>Nama Periode</label><input id="f_periode" placeholder="cth: ${getCurrentPeriodName()}" value="${a.periode || getCurrentPeriodName()}"></div>
-      <div class="field"><label>Periode Mulai</label><input id="f_angMulai" type="date" value="${a.mulai || s.periodeMulai || ''}" onchange="syncAnggaranNama()"></div>
-      <div class="field"><label>Periode Selesai</label><input id="f_angSelesai" type="date" value="${a.selesai || s.periodeSelesai || ''}" onchange="syncAnggaranNama()"></div>
+      <div class="field"><label>Nama Periode</label><input id="f_periode" placeholder="cth: ${getCurrentPeriodName()}" value="${esc(a.periode || getCurrentPeriodName())}"></div>
+      <div class="field"><label>Periode Mulai</label><input id="f_angMulai" type="date" value="${esc(a.mulai || s.periodeMulai || '')}" onchange="syncAnggaranNama()"></div>
+      <div class="field"><label>Periode Selesai</label><input id="f_angSelesai" type="date" value="${esc(a.selesai || s.periodeSelesai || '')}" onchange="syncAnggaranNama()"></div>
     </div>
     <p class="sub" style="margin-top:-4px;">Rentang tanggal ini yang dipakai sebagai pilihan periode saat mengunduh Buku Otomatis.</p>
     <div class="grid c3">
@@ -1696,6 +2036,44 @@
       <div class="field"><label>Anggaran Insentif Fasilitas</label><input id="f_angFas" type="number" value="${a.insentifFasilitas || 0}"></div>
     </div>
     <button class="btn btn-primary" onclick="saveAnggaran()">Simpan Anggaran</button>
+  </div>
+
+  <div class="card">
+    <h2>Referensi Barang Persediaan</h2>
+    <p class="sub" style="margin-top:-4px;">Katalog bawaan mengikuti MASTER_4 dan ikut tercetak pada sheet Barang Persediaan di Buku Otomatis. Tambahkan item sendiri bila belum ada di daftar.</p>
+    <div class="grid c4">
+      <div class="field"><label>Sub-Kelompok</label><select id="b_sub">${subKelompokBarang().map(sub => `<option value="${esc(sub.kode)}">${esc(sub.kode)} - ${esc(sub.nama)}</option>`).join('')}</select></div>
+      <div class="field"><label>Nama Barang</label><input id="b_nama" placeholder="cth: Beras merah organik"></div>
+      <div class="field"><label>Satuan</label><select id="b_satuan">${['kg', 'pak', 'liter', 'ikat', 'pcs', 'botol', 'dus'].map(u => `<option value="${u}">${u}</option>`).join('')}</select></div>
+      <div class="field" style="display:flex;align-items:flex-end;"><button class="btn btn-gold" style="width:100%;" onclick="addBarang()">Tambah Barang</button></div>
+    </div>
+    <hr class="sep">
+    ${(() => {
+        const kunci = cariBarang.trim().toLowerCase();
+        const cocok = DB.barang.filter(b => !kunci
+            || b.nama.toLowerCase().includes(kunci) || b.kode.toLowerCase().includes(kunci));
+        const item = cocok.filter(b => b.level === 3);
+        const tampil = item.slice(0, 50);
+        return `
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+      <div class="field" style="margin-bottom:0;max-width:320px;flex:1;">
+        <label>Cari Barang</label>
+        <input value="${esc(cariBarang)}" oninput="filterBarang(this.value)" placeholder="Nama atau kode barang">
+      </div>
+      <div class="small muted" style="padding-bottom:10px;">
+        ${DB.barang.filter(b => b.level === 3).length} item dalam ${subKelompokBarang().length} sub-kelompok
+      </div>
+    </div>
+    ${item.length === 0 ? '<div class="empty">Tidak ada barang yang cocok.</div>' : `
+    <table><thead><tr><th>Kode</th><th>Nama Barang</th><th>Kelompok</th><th>Satuan</th><th></th></tr></thead>
+    <tbody>${tampil.map(b => `<tr>
+      <td>${esc(b.kode)}</td><td>${esc(b.nama)}</td><td class="small muted">${esc(namaKelompok(b.kode))}</td><td>${esc(b.satuan)}</td>
+      <td><button class="link-btn" onclick="delBarang('${esc(b.kode)}')">hapus</button></td></tr>`).join('')}
+    </tbody></table>
+    ${item.length > tampil.length ? `<p class="small muted">Menampilkan ${tampil.length} dari ${item.length} item — persempit dengan kotak pencarian.</p>` : ''}`}`;
+    })()}
+    <hr class="sep">
+    <button class="btn btn-outline btn-sm" onclick="resetBarang()">Kembalikan ke Katalog Bawaan</button>
   </div>
 
   <div class="card">
@@ -1710,7 +2088,7 @@
     ${DB.pemasok.length === 0 ? '<div class="empty">Belum ada pemasok.</div>' : `
     <table><thead><tr><th>Nama</th><th>Kontak</th><th>Alamat</th><th></th></tr></thead>
     <tbody>
-      ${DB.pemasok.map(p => `<tr><td>${p.nama}</td><td>${p.kontak || '-'}</td><td>${p.alamat || '-'}</td>
+      ${DB.pemasok.map(p => `<tr><td>${esc(p.nama)}</td><td>${esc(p.kontak || '-')}</td><td>${esc(p.alamat || '-')}</td>
       <td><button class="link-btn" onclick="delPemasok('${p.id}')">hapus</button></td></tr>`).join('')}
     </tbody></table>`}
   </div>
@@ -1769,6 +2147,61 @@
         save('pemasok'); render();
     }
 
+    // ---------- referensi barang persediaan ----------
+    // The catalogue is three levels deep: kelompok (KH), sub-kelompok (KH.01) and
+    // item (KH.01.001). Only items are added by hand, always inside an existing
+    // sub-kelompok, so the coding stays consistent with the master.
+    function subKelompokBarang() {
+        return (DB.barang || []).filter(b => b.level === 2);
+    }
+    function namaKelompok(kode) {
+        const induk = (DB.barang || []).find(b => b.kode === kode.split('.')[0]);
+        return induk ? induk.nama : '';
+    }
+    // Fills the first free slot in the sub-kelompok instead of appending, so a
+    // deleted code is reused and 099 ("lainnya") is left alone.
+    function kodeBarangBerikutnya(kodeSub) {
+        const dipakai = new Set((DB.barang || [])
+            .filter(b => b.level === 3 && b.kode.startsWith(kodeSub + '.'))
+            .map(b => Number(b.kode.split('.')[2])));
+        for (let n = 1; n <= 998; n += 1) {
+            if (n !== 99 && !dipakai.has(n)) return `${kodeSub}.${String(n).padStart(3, '0')}`;
+        }
+        return null;
+    }
+    function addBarang() {
+        const kodeSub = val('b_sub');
+        const nama = val('b_nama').trim();
+        const satuan = val('b_satuan').trim();
+        if (!kodeSub) { toast('Pilih sub-kelompok dulu'); return; }
+        if (!nama) { toast('Nama barang wajib diisi'); return; }
+        if (DB.barang.some(b => b.nama.toLowerCase() === nama.toLowerCase())) {
+            toast('Nama barang itu sudah ada di katalog'); return;
+        }
+        const kode = kodeBarangBerikutnya(kodeSub);
+        if (!kode) { toast('Sub-kelompok ini sudah penuh'); return; }
+        DB.barang.push({ kode, nama, satuan: satuan || 'pcs', level: 3 });
+        DB.barang.sort((a, b) => a.kode.localeCompare(b.kode));
+        save('barang'); render();
+        toast(`${nama} ditambahkan dengan kode ${kode}`);
+    }
+    function delBarang(kode) {
+        const item = DB.barang.find(b => b.kode === kode);
+        if (!item) return;
+        DB.barang = DB.barang.filter(b => b.kode !== kode);
+        save('barang'); render();
+        toast(`${esc(item.nama)} dihapus dari katalog`);
+    }
+    function filterBarang(nilai) {
+        cariBarang = nilai;
+        render();
+    }
+    function resetBarang() {
+        DB.barang = DEFAULT_BARANG.slice();
+        save('barang'); render();
+        toast('Katalog dikembalikan ke daftar bawaan');
+    }
+
     // ---------- TRANSAKSI ----------
     function renderTransaksi() {
         const kasOpt = coaOptions(['Kas']);
@@ -1804,8 +2237,8 @@
     <table><thead><tr><th>Tanggal</th><th>No Bukti</th><th>Uraian</th><th>Akun Kas</th><th>Akun Lawan</th><th class="right">Debit</th><th class="right">Kredit</th><th>Status</th><th></th></tr></thead>
     <tbody>
       ${rows.map(t => `<tr>
-        <td>${fmtDate(t.tanggal)}</td><td>${t.noBukti || '-'}</td><td>${t.uraian}</td>
-        <td>${coaByKode(t.akunKas)?.nama || t.akunKas}</td><td>${coaByKode(t.akunLawan)?.nama || t.akunLawan}</td>
+        <td>${fmtDate(t.tanggal)}</td><td>${esc(t.noBukti || '-')}</td><td>${esc(t.uraian)}</td>
+        <td>${esc(coaByKode(t.akunKas)?.nama || t.akunKas)}</td><td>${esc(coaByKode(t.akunLawan)?.nama || t.akunLawan)}</td>
         <td class="right">${t.tipe === 'D' ? rupiah(t.jumlah) : '-'}</td>
         <td class="right">${t.tipe === 'K' ? rupiah(t.jumlah) : '-'}</td>
         <td>${statusBadge(t)}</td>
@@ -1954,7 +2387,7 @@
     <h2>OCR Struk &amp; Import Data Belanja</h2>
     <p class="sub">Foto struk (baca otomatis AI) atau unggah file Excel / CSV berisi daftar pengeluaran belanja.</p>
     <div class="grid c2">
-      <div class="field"><label>Nama Kamu / Pengirim</label><input id="ocrq_nama" value="${s.namaPengirimDefault || ''}" placeholder="cth: Budi (Gudang)"></div>
+      <div class="field"><label>Nama Kamu / Pengirim</label><input id="ocrq_nama" value="${esc(s.namaPengirimDefault || '')}" placeholder="cth: Budi (Gudang)"></div>
       <div class="field"><label>Foto Struk/Nota</label><input type="file" id="ocrq_file" accept="image/*" capture="environment"></div>
     </div>
     <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:10px; align-items:center;">
@@ -1981,7 +2414,7 @@
         <div style="display:flex;gap:10px;">
           ${o.thumb ? `<img src="data:image/jpeg;base64,${o.thumb}" style="width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid var(--line);">` : ''}
           <div>
-            <b>${e.vendor || 'Vendor tidak terbaca'}</b> · ${rupiah(total)}
+            <b>${esc(e.vendor || 'Vendor tidak terbaca')}</b> · ${rupiah(total)}
             <div class="small muted">Dikirim oleh ${o.submittedBy || '-'} · ${fmtDate(o.tanggalKirim)} · struk tgl ${fmtDate(e.tanggal)}</div>
             <div class="small muted">${(e.items || []).map(i => i.nama + ' x' + i.jumlah).join(', ') || '-'}</div>
           </div>
@@ -2000,7 +2433,7 @@
             html += '<hr class="sep"><div class="small muted" style="margin-bottom:6px;"><b>Sudah diproses (10 terbaru):</b></div>';
             html += done.map(o => {
                 const e = o.extracted || {};
-                return `<div class="small muted" style="padding:4px 0;">${fmtDate(o.tanggalKirim)} · ${e.vendor || '-'} · ${rupiah(Number(e.total) || 0)} · oleh ${o.submittedBy || '-'}</div>`;
+                return `<div class="small muted" style="padding:4px 0;">${fmtDate(o.tanggalKirim)} · ${esc(e.vendor || '-')} · ${rupiah(Number(e.total) || 0)} · oleh ${o.submittedBy || '-'}</div>`;
             }).join('');
         }
         return html;
@@ -2118,7 +2551,7 @@
             const pm = DB.pemasok.find(x => x.id === p.pemasokId);
             const total = p.items.reduce((s, i) => s + i.total, 0);
             return `<tr>
-          <td>${fmtDate(p.tanggalTransaksi)}</td><td>${pm ? pm.nama : '-'}</td>
+          <td>${fmtDate(p.tanggalTransaksi)}</td><td>${esc(pm ? pm.nama : '-')}</td>
           <td class="right">${rupiah(total)}</td>
           <td>${p.status === 'terkirim' ? '<span class="badge badge-ok">Terkirim</span>' : '<span class="badge badge-warn">Draft</span>'}</td>
           <td class="row-actions">
@@ -2177,11 +2610,11 @@
     <table class="item-table"><thead><tr><th>Nama Barang</th><th>Kategori</th><th>Harga</th><th>Jumlah</th><th>Satuan</th><th class="right">Total</th><th></th></tr></thead>
     <tbody id="itemsBody">
       ${d.items.map((it, i) => `<tr>
-        <td><input value="${it.namaBarang}" oninput="updItem(${i},'namaBarang',this.value)"></td>
+        <td><input value="${esc(it.namaBarang)}" oninput="updItem(${i},'namaBarang',this.value)"></td>
         <td><input value="${it.kategori}" oninput="updItem(${i},'kategori',this.value)"></td>
         <td><input type="number" value="${it.harga}" oninput="updItem(${i},'harga',this.value)"></td>
         <td><input type="number" value="${it.jumlah}" oninput="updItem(${i},'jumlah',this.value)"></td>
-        <td><input value="${it.satuan}" oninput="updItem(${i},'satuan',this.value)"></td>
+        <td><input value="${esc(it.satuan)}" oninput="updItem(${i},'satuan',this.value)"></td>
         <td class="right" id="itemTotal${i}">${rupiah(it.total)}</td>
         <td><button class="link-btn" onclick="removeItem(${i})">✕</button></td>
       </tr>`).join('')}
@@ -2304,8 +2737,8 @@
     <h2>Siap disalin ke SIPGN → Pembelian Langsung</h2>
     <div class="copybox">Tanggal Transaksi : ${fmtDate(d.tanggalTransaksi)}
 Tanggal Diterima  : ${fmtDate(d.tanggalDiterima)}
-Nama Pemasok      : ${pm ? pm.nama : '-'}${pm && pm.kontak ? ' (' + pm.kontak + ')' : ''}
-${d.items.map(i => `- ${i.namaBarang} | Kategori: ${i.kategori || '-'} | Harga: ${rupiah(i.harga)} | Jumlah: ${i.jumlah} ${i.satuan} | Total: ${rupiah(i.total)}`).join('\n')}
+Nama Pemasok      : ${esc(pm ? pm.nama : '-')}${esc(pm && pm.kontak ? ' (' + pm.kontak + ')' : '')}
+${d.items.map(i => `- ${esc(i.namaBarang)} | Kategori: ${i.kategori || '-'} | Harga: ${rupiah(i.harga)} | Jumlah: ${i.jumlah} ${esc(i.satuan)} | Total: ${rupiah(i.total)}`).join('\n')}
 Subtotal Barang   : ${rupiah(total)}${biayaAdmin > 0 ? `
 Biaya Admin Bank/Layanan : ${rupiah(biayaAdmin)}
 Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
@@ -2361,7 +2794,7 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
     <h2>Daftar Batch Pembayaran</h2>
     ${batchList.length === 0 ? '<div class="empty">Belum ada batch pembayaran.</div>' : `
     <table><thead><tr><th>Jatuh Tempo</th><th>Jenis</th><th>Penerima</th><th class="right">Jumlah</th><th>Status</th></tr></thead>
-    <tbody>${batchList.map(b => `<tr><td>${fmtDate(b.jatuhTempo)}</td><td>${b.jenis === 'upah' ? 'Upah' : 'Vendor'}</td><td>${b.penerima}</td>
+    <tbody>${batchList.map(b => `<tr><td>${fmtDate(b.jatuhTempo)}</td><td>${b.jenis === 'upah' ? 'Upah' : 'Vendor'}</td><td>${esc(b.penerima)}</td>
       <td class="right">${rupiah(b.jumlah)}</td>
       <td>${b.status === 'approved' ? '<span class="badge badge-ok">Disetujui & Tercatat</span>' : b.status === 'ditolak' ? '<span class="badge badge-bad">Ditolak</span>' : '<span class="badge badge-warn">Menunggu</span>'}</td>
       </tr>`).join('')}</tbody></table>`}
@@ -2412,7 +2845,7 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
       <th>Nama</th><th>Departemen</th><th>Pekerjaan</th><th class="right">Hari</th><th class="right">Upah</th><th class="right">BPJS</th><th class="right">Honor PJ</th><th class="right">Total</th><th></th></tr></thead>
     <tbody>${rows.map(n => `<tr>
       <td class="center"><input type="checkbox" ${nominatifSelected.has(n.id) ? 'checked' : ''} onchange="toggleNominatifSelect('${n.id}')" title="Sertakan di pembukuan"></td>
-      <td>${n.nama}</td><td>${n.departemen || '-'}</td><td>${n.pekerjaan}</td><td class="right">${n.hari}</td>
+      <td>${esc(n.nama)}</td><td>${esc(n.departemen || '-')}</td><td>${esc(n.pekerjaan)}</td><td class="right">${n.hari}</td>
       <td class="right">${rupiah(n.upah)}</td><td class="right">${rupiah(n.bpjs)}</td><td class="right">${rupiah(n.honorPJ)}</td>
       <td class="right"><b>${rupiah(n.grandTotal)}</b></td>
       <td><button class="link-btn" onclick="delNominatif('${n.id}')">hapus</button></td></tr>`).join('')}
@@ -2699,7 +3132,12 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
                 danaPemasukan: saldoAwal(sebelum) + diterima,
                 ...realisasi,
             },
-            barang: { masuk: masukBarang },
+            barang: {
+                masuk: masukBarang,
+                // The Ref_Brg sheet is written from the account's own catalogue, so
+                // items the operator added show up in the workbook too.
+                katalog: (DB.barang || []).map(b => ({ kode: b.kode, nama: b.nama, satuan: b.satuan || '' })),
+            },
             catatan: {
                 ringkasan: { sisaLalu: saldoAwal(sebelum), diterima, ...realisasi },
                 rows: harian,
@@ -2849,7 +3287,7 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
             await requestWorkbook({
                 filename: `Slip_Gaji_${safeName}.xlsx`, workers: [worker], dayCount, periodeLabel: label,
             });
-            toast(`Slip gaji ${worker.nama} berhasil diunduh`);
+            toast(`Slip gaji ${esc(worker.nama)} berhasil diunduh`);
         } catch (error) {
             toast(error.message || 'Koneksi ke server gagal, slip tidak dapat dibuat');
         } finally {
@@ -2954,7 +3392,7 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
         <th>Nama</th><th>Departemen</th><th>Pekerjaan</th><th class="right">Hari</th><th class="right">Total</th><th></th></tr></thead>
       <tbody>${rows.map(n => `<tr>
         <td class="center"><input type="checkbox" ${nominatifSelected.has(n.id) ? 'checked' : ''} onchange="toggleNominatifSelect('${n.id}')"></td>
-        <td>${n.nama}</td><td>${n.departemen || '-'}</td><td>${n.pekerjaan}</td><td class="right">${n.hari}</td>
+        <td>${esc(n.nama)}</td><td>${esc(n.departemen || '-')}</td><td>${esc(n.pekerjaan)}</td><td class="right">${n.hari}</td>
         <td class="right"><b>${rupiah(n.grandTotal)}</b></td>
         <td class="right"><button class="btn btn-outline btn-sm" ${slipExportId ? 'disabled' : ''} onclick="downloadSlipGaji('${n.id}')">
           ${slipExportId === n.id ? 'Membuat…' : 'Unduh Slip Gaji'}
@@ -2978,7 +3416,7 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
     <h2>Buku Kas Umum (BKU)</h2>
     ${rows.length === 0 ? '<div class="empty">Belum ada data.</div>' : `
     <table><thead><tr><th>Tanggal</th><th>No Bukti</th><th>Uraian</th><th class="right">Debit</th><th class="right">Kredit</th><th class="right">Saldo</th></tr></thead>
-    <tbody>${rows.map(r => `<tr><td>${fmtDate(r.tanggal)}</td><td>${r.noBukti || '-'}</td><td>${r.uraian}</td>
+    <tbody>${rows.map(r => `<tr><td>${fmtDate(r.tanggal)}</td><td>${esc(r.noBukti || '-')}</td><td>${esc(r.uraian)}</td>
       <td class="right">${r.d ? rupiah(r.d) : '-'}</td><td class="right">${r.k ? rupiah(r.k) : '-'}</td><td class="right"><b>${rupiah(r.saldo)}</b></td></tr>`).join('')}
     </tbody></table>`}
   </div>`;
@@ -2988,10 +3426,10 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
         return kasAccounts.map(ka => {
             const rows = dalamPeriodeBuku(ledgerForKas(ka.kode));
             return `<div class="card">
-      <h2>BP Kas — ${ka.nama}</h2>
+      <h2>BP Kas — ${esc(ka.nama)}</h2>
       ${rows.length === 0 ? '<div class="empty">Belum ada data.</div>' : `
       <table><thead><tr><th>Tanggal</th><th>No Bukti</th><th>Uraian</th><th class="right">Debit</th><th class="right">Kredit</th><th class="right">Saldo</th></tr></thead>
-      <tbody>${rows.map(r => `<tr><td>${fmtDate(r.tanggal)}</td><td>${r.noBukti || '-'}</td><td>${r.uraian}</td>
+      <tbody>${rows.map(r => `<tr><td>${fmtDate(r.tanggal)}</td><td>${esc(r.noBukti || '-')}</td><td>${esc(r.uraian)}</td>
         <td class="right">${r.d ? rupiah(r.d) : '-'}</td><td class="right">${r.k ? rupiah(r.k) : '-'}</td><td class="right"><b>${rupiah(r.saldo)}</b></td></tr>`).join('')}
       </tbody></table>`}
     </div>`;
@@ -3004,7 +3442,7 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
     
     ${rows.length === 0 ? '<div class="empty">Belum ada data.</div>' : `
     <table><thead><tr><th>Tanggal</th><th>Uraian</th><th class="right">Dana Masuk</th><th class="right">Biaya</th><th class="right">Saldo</th></tr></thead>
-    <tbody>${rows.map(r => `<tr><td>${fmtDate(r.tanggal)}</td><td>${r.uraian}</td>
+    <tbody>${rows.map(r => `<tr><td>${fmtDate(r.tanggal)}</td><td>${esc(r.uraian)}</td>
       <td class="right">${r.masuk ? rupiah(r.masuk) : '-'}</td><td class="right">${r.keluar ? rupiah(r.keluar) : '-'}</td><td class="right"><b>${rupiah(r.saldo)}</b></td></tr>`).join('')}
     </tbody></table>`}
   </div>`;
@@ -3018,7 +3456,7 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
     <h2>Buku Pembantu — Pajak</h2>
     ${rows.length === 0 ? '<div class="empty">Belum ada data pajak.</div>' : `
     <table><thead><tr><th>Tanggal</th><th>Jenis Pajak</th><th>Uraian</th><th class="right">Jumlah</th></tr></thead>
-    <tbody>${rows.map(r => `<tr><td>${fmtDate(r.tanggal)}</td><td>${coaByKode(r.akunLawan)?.nama}</td><td>${r.uraian}</td><td class="right">${rupiah(r.jumlah)}</td></tr>`).join('')}
+    <tbody>${rows.map(r => `<tr><td>${fmtDate(r.tanggal)}</td><td>${esc(coaByKode(r.akunLawan)?.nama)}</td><td>${esc(r.uraian)}</td><td class="right">${rupiah(r.jumlah)}</td></tr>`).join('')}
     </tbody></table>
     <hr class="sep">
     <b>Total per jenis:</b>
@@ -3032,7 +3470,7 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
     <h2>Catatan Pengeluaran</h2>
     ${rows.length === 0 ? '<div class="empty">Belum ada pengeluaran.</div>' : `
     <table><thead><tr><th>Tanggal</th><th>Uraian</th><th>Kategori</th><th class="right">Jumlah</th></tr></thead>
-    <tbody>${rows.map(r => `<tr><td>${fmtDate(r.tanggal)}</td><td>${r.uraian}</td><td>${coaByKode(r.akunLawan)?.kategori || '-'}</td><td class="right">${rupiah(r.jumlah)}</td></tr>`).join('')}
+    <tbody>${rows.map(r => `<tr><td>${fmtDate(r.tanggal)}</td><td>${esc(r.uraian)}</td><td>${coaByKode(r.akunLawan)?.kategori || '-'}</td><td class="right">${rupiah(r.jumlah)}</td></tr>`).join('')}
     </tbody></table>`}
   </div>`;
     }
@@ -3055,7 +3493,7 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
 
         return `
   <div class="card">
-    <h2>Laporan Penggunaan Anggaran (LPA) — ${a.periode || '(periode belum diisi)'}</h2>
+    <h2>Laporan Penggunaan Anggaran (LPA) — ${esc(a.periode || '(periode belum diisi)')}</h2>
     <table><thead><tr><th>Kategori</th><th class="right">Anggaran</th><th class="right">Realisasi</th><th class="right">Sisa</th></tr></thead>
     <tbody>
       <tr><td>Bahan Makanan</td><td class="right">${rupiah(a.bahanMakanan)}</td><td class="right">${rupiah(biayaBahan)}</td><td class="right">${rupiah(a.bahanMakanan - biayaBahan)}</td></tr>
@@ -3078,7 +3516,7 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
     <p class="sub">Jumlah jauh di atas rata-rata kategori.</p>
     ${anomali.length === 0 ? '<div class="empty">Tidak ada anomali terdeteksi.</div>' : `
     <table><thead><tr><th>Tanggal</th><th>Uraian</th><th>Kategori</th><th class="right">Jumlah</th><th class="right">Rata-rata Kategori</th></tr></thead>
-    <tbody>${anomali.map(r => `<tr><td>${fmtDate(r.tanggal)}</td><td>${r.uraian}</td><td>${r.kategori}</td>
+    <tbody>${anomali.map(r => `<tr><td>${fmtDate(r.tanggal)}</td><td>${esc(r.uraian)}</td><td>${r.kategori}</td>
       <td class="right"><span class="badge badge-warn">${rupiah(r.jumlah)}</span></td><td class="right">${rupiah(Math.round(r.rata))}</td></tr>`).join('')}
     </tbody></table>`}
   </div>
@@ -3095,9 +3533,9 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
     <h2>Dokumen Pendukung</h2>
     <p class="sub">Draf teks, salin ke template resmi.</p>
     <div class="copybox">SURAT PERNYATAAN TANGGUNG JAWAB (draf)
-Periode           : ${a.periode || '-'}
-Nama SPPG         : ${DB.setup.namaSPPG || '-'}
-Kepala SPPG       : ${DB.setup.kepalaSPPG || '-'}
+Periode           : ${esc(a.periode || '-')}
+Nama SPPG         : ${esc(DB.setup.namaSPPG || '-')}
+Kepala SPPG       : ${esc(DB.setup.kepalaSPPG || '-')}
 Total Anggaran    : ${rupiah(totalAnggaran)}
 Total Realisasi   : ${rupiah(totalRealisasi)}
 Sisa Dana         : ${rupiah(totalAnggaran - totalRealisasi)}

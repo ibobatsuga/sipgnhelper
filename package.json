@@ -1,11 +1,9 @@
 {
   "name": "sipgnhelper",
   "version": "1.0.0",
-  "description": "SIPGN Helper - Fullstack Data Management & Automation Platform",
+  "description": "SIPGN Helper - pencatatan, pembukuan, dan pelaporan untuk SPPG",
   "private": true,
   "scripts": {
-    "dev:backend": "cd backend && npm run dev",
-    "dev:frontend": "cd frontend && npm run dev",
     "build": "echo 'Static build complete'",
     "test": "node --test tests/*.test.js"
   },

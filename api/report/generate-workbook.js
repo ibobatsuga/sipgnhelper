@@ -203,7 +203,7 @@ const formulaIsPortable = (formula, presentSheets) => {
 };
 
 const cloneSheet = (workbook, templateSheet, sheetName, options) => {
-  const { lastRow, lastCol, presentSheets = new Set(), overrides = {} } = options;
+  const { lastRow, lastCol, presentSheets = new Set(), overrides = {}, rewrite } = options;
   const sheet = workbook.addWorksheet(sheetName, {
     properties: { tabColor: templateSheet.properties.tabColor },
     views: templateSheet.views,
@@ -228,7 +228,7 @@ const cloneSheet = (workbook, templateSheet, sheetName, options) => {
         // A shared formula is re-anchored by ExcelJS on read, so the master
         // formula of the group is the one worth carrying.
         targetCell.value = sourceCell.formula && formulaIsPortable(sourceCell.formula, presentSheets)
-          ? { formula: sourceCell.formula }
+          ? { formula: rewrite ? rewrite(sourceCell.formula) : sourceCell.formula }
           : null;
       } else {
         targetCell.value = literalValueOf(sourceCell);
@@ -558,9 +558,80 @@ const KELUAR_ENTRY_ROW = 8;
 const MASUK_MIN_ROWS = 40;
 const KELUAR_FORM_ROWS = 40;
 
+const REF_BRG_FIRST_ROW = 8;
+const REF_BRG_TEMPLATE_LAST = 311; // last catalogue row in MASTER_4
+
+// Repeats a template row past the end of the master's own data. Relative row
+// numbers move with the row; anything anchored with $ stays put, which is what
+// the absolute lookup ranges rely on.
+const shiftFormulaRows = (formula, fromRow, toRow) => formula.replace(
+  /(\$?[A-Za-z]{1,3})(\$?)(\d+)/g,
+  (match, col, anchored, row) => (anchored === '$' || Number(row) !== fromRow ? match : `${col}${toRow}`),
+);
+
+const extendPatternRows = (templateSheet, sheet, options) => {
+  const { patternRow, fromRow, toRow, lastCol, presentSheets, rewrite } = options;
+  const source = templateSheet.getRow(patternRow);
+  for (let rowNumber = fromRow; rowNumber <= toRow; rowNumber += 1) {
+    const target = sheet.getRow(rowNumber);
+    for (let col = 1; col <= lastCol; col += 1) {
+      const sourceCell = source.getCell(col);
+      const targetCell = target.getCell(col);
+      targetCell.style = sourceCell.style;
+      if (sourceCell.formula && formulaIsPortable(sourceCell.formula, presentSheets)) {
+        const moved = shiftFormulaRows(sourceCell.formula, patternRow, rowNumber);
+        targetCell.value = { formula: rewrite ? rewrite(moved) : moved };
+      } else {
+        targetCell.value = null;
+      }
+    }
+    target.height = source.height;
+    target.commit();
+  }
+};
+
+// The catalogue now lives in SIPGN Helper, so the sheet is written from what the
+// account actually holds rather than from the master's frozen copy. The rows the
+// app sends replace the template's, and any it does not fill are blanked so a
+// shortened catalogue cannot leave the master's items behind.
+const fillRefBrg = (sheet, katalog, lastRow) => {
+  for (let rowNumber = REF_BRG_FIRST_ROW; rowNumber <= lastRow; rowNumber += 1) {
+    const item = katalog[rowNumber - REF_BRG_FIRST_ROW];
+    const row = sheet.getRow(rowNumber);
+    row.getCell('A').value = item ? asText(item.kode, 20) : null;
+    row.getCell('B').value = item ? asText(item.nama, 120) : null;
+    row.getCell('C').value = item ? asText(item.satuan, 20) || null : null;
+    row.commit();
+  }
+};
+
 const buildBarangSheets = (workbook, templateFor, barang, presentSheets) => {
-  cloneSheet(workbook, templateFor('Ref_Brg'), 'Ref_Brg', { lastRow: REF_BRG_LAST_ROW, lastCol: 6, presentSheets });
-  cloneSheet(workbook, templateFor('Saldo_Brg'), 'Saldo_Brg', { lastRow: REF_BRG_LAST_ROW, lastCol: 8, presentSheets });
+  const katalog = barang.katalog || [];
+  // Every dependent sheet mirrors the catalogue row for row, so they all grow
+  // with it — Saldo_Brg and the stock detail read Ref_Brg by matching row number.
+  const katalogLastRow = Math.max(katalog.length + REF_BRG_FIRST_ROW - 1, REF_BRG_TEMPLATE_LAST);
+  const katalogRows = Math.max(katalogLastRow + 4, REF_BRG_LAST_ROW);
+  // The master's lookups stop at the last row of its own catalogue. A longer one
+  // needs those bounds widened or the stock report would ignore the new items.
+  const rewrite = katalogLastRow > REF_BRG_TEMPLATE_LAST
+    ? (formula) => formula.replace(new RegExp(`\\$${REF_BRG_TEMPLATE_LAST}\\b`, 'g'), `$${katalogLastRow}`)
+    : undefined;
+  const grow = (sheet, templateSheet, lastCol) => {
+    if (katalogLastRow <= REF_BRG_TEMPLATE_LAST) return;
+    extendPatternRows(templateSheet, sheet, {
+      patternRow: REF_BRG_TEMPLATE_LAST,
+      fromRow: REF_BRG_TEMPLATE_LAST + 1,
+      toRow: katalogLastRow,
+      lastCol,
+      presentSheets,
+      rewrite,
+    });
+  };
+
+  const refBrg = cloneSheet(workbook, templateFor('Ref_Brg'), 'Ref_Brg', { lastRow: katalogRows, lastCol: 6, presentSheets, rewrite });
+  if (katalog.length) fillRefBrg(refBrg, katalog, katalogRows);
+  const saldoBrg = cloneSheet(workbook, templateFor('Saldo_Brg'), 'Saldo_Brg', { lastRow: katalogRows, lastCol: 8, presentSheets, rewrite });
+  grow(saldoBrg, templateFor('Saldo_Brg'), 8);
 
   const masukRows = barang.masuk || [];
   const masuk = cloneSheet(workbook, templateFor('Masuk'), 'Masuk', {
@@ -589,8 +660,9 @@ const buildBarangSheets = (workbook, templateFor, barang, presentSheets) => {
     lastRow: KELUAR_ENTRY_ROW + KELUAR_FORM_ROWS - 1, lastCol: 8, presentSheets,
   });
   // Column AA feeds the rekap's SUMIF, so the detail sheet keeps its full width.
-  cloneSheet(workbook, templateFor('Stock_Brg (D)'), 'Stock_Brg (D)', { lastRow: REF_BRG_LAST_ROW, lastCol: 28, presentSheets });
-  cloneSheet(workbook, templateFor('Stock_Brg (R)'), 'Stock_Brg (R)', { lastRow: 48, lastCol: 8, presentSheets });
+  const stockDetail = cloneSheet(workbook, templateFor('Stock_Brg (D)'), 'Stock_Brg (D)', { lastRow: katalogRows, lastCol: 28, presentSheets, rewrite });
+  grow(stockDetail, templateFor('Stock_Brg (D)'), 28);
+  cloneSheet(workbook, templateFor('Stock_Brg (R)'), 'Stock_Brg (R)', { lastRow: 48, lastCol: 8, presentSheets, rewrite });
 };
 
 // ---------------------------------------------------------------------------
@@ -786,6 +858,9 @@ const isMasukRow = (row) => row && typeof row === 'object'
   && parseISODate(row.tanggal) !== null
   && isFiniteNumber(row.vol ?? 0) && isFiniteNumber(row.harga ?? 0);
 
+const isKatalogRow = (row) => row && typeof row === 'object'
+  && isNonEmptyString(row.kode) && isNonEmptyString(row.nama);
+
 // ---------------------------------------------------------------------------
 // Workbook assembly
 // ---------------------------------------------------------------------------
@@ -900,6 +975,7 @@ const buildBukuWorkbook = (workbook, templateWorkbook, buku, profil, periodeText
   // --- Barang Persediaan ----------------------------------------------------
   const barang = buku.barang || {};
   validateRows(barang.masuk || [], isMasukRow, 'Penerimaan Barang');
+  validateRows(barang.katalog || [], isKatalogRow, 'Referensi Barang');
   buildBarangSheets(workbook, templateFor, barang, presentSheets);
 };
 
