@@ -3,6 +3,27 @@ const ExcelJS = require('exceljs');
 
 const TEMPLATE_PATH = path.join(__dirname, 'templates/MASTER_4.xlsx');
 
+// MASTER_4 is read purely as a style source and never re-serialized: ExcelJS
+// models only a subset of OOXML, so writing that workbook back out drops its
+// pivot caches, external links, comments and all but a handful of its 243
+// defined names, which makes Excel report the download as corrupt and "repair"
+// it. Emitting a fresh workbook that only holds the generated sheets keeps the
+// layout identical with nothing to repair.
+//
+// Parsing those 2 MB dominates a request, so a warm container parses them once.
+// The promise (not the workbook) is cached, so two requests arriving together
+// share one parse instead of racing; a failed parse is dropped so the next
+// request retries rather than serving the failure forever. The template is only
+// ever read from, never written to, so sharing it between requests is safe.
+let templatePromise = null;
+const loadTemplate = () => {
+  if (!templatePromise) {
+    templatePromise = new ExcelJS.Workbook().xlsx.readFile(TEMPLATE_PATH)
+      .catch((error) => { templatePromise = null; throw error; });
+  }
+  return templatePromise;
+};
+
 // ---------------------------------------------------------------------------
 // DafNom (daftar nominatif upah) — one row per personel.
 // ---------------------------------------------------------------------------
@@ -23,10 +44,14 @@ const TRAILING_COLS = 5; // O..S: HONORARIUM, DANA KESEHATAN, TK, PJ, TOTAL
 const DAFNOM_TOTAL_ROW = 57; // the master's TOTAL row, reused for its styling
 const MAX_WORKERS = 100;
 
-// Ledger sheets are capped well above a realistic month so a corrupt payload
-// cannot make the function build an endless workbook.
-const MAX_ROWS_PER_BOOK = 600;
+// Ledger sheets are capped well above a realistic month — a busy SPPG books a
+// few dozen transaksi a day — so a corrupt payload cannot make the function
+// build an endless workbook, without the cap ever being reached in practice.
+const MAX_ROWS_PER_BOOK = 2000;
 const MAX_BOOKS_PER_GROUP = 12;
+
+// Reported to the caller instead of being swallowed as an internal fault.
+class PayloadError extends Error {}
 
 const isNonEmptyString = (value) => typeof value === 'string' && value.trim().length > 0;
 const isFiniteNonNegative = (value) => typeof value === 'number' && Number.isFinite(value) && value >= 0;
@@ -43,7 +68,15 @@ const isWorker = (worker) => worker && typeof worker === 'object'
   && (worker.departemen === undefined || typeof worker.departemen === 'string');
 
 const sanitizeSheetName = (raw, fallback, usedNames) => {
-  const cleaned = String(raw).replace(/[\\/?*[\]:]/g, ' ').trim().slice(0, 28);
+  // Excel bans \/?*[]: anywhere and a single quote at either end, and caps the
+  // name at 31 characters. A rejected name makes ExcelJS throw mid-write, so the
+  // name is scrubbed here rather than trusted from the payload.
+  const cleaned = String(raw)
+    .replace(/[\\/?*[\]:]/g, ' ')
+    .replace(/[\u0000-\u001f]/g, ' ')
+    .replace(/^['\s]+|['\s]+$/g, '')
+    .slice(0, 28)
+    .replace(/['\s]+$/, '');
   const base = cleaned || fallback;
   let candidate = base;
   let suffix = 2;
@@ -473,15 +506,15 @@ const isCatatanRow = (row) => row && typeof row === 'object'
   && isFiniteNumber(row.jumlah ?? 0);
 
 const validateRows = (rows, predicate, label) => {
-  if (!Array.isArray(rows)) throw new Error(`Data ${label} tidak valid`);
-  if (rows.length > MAX_ROWS_PER_BOOK) throw new Error(`${label} melebihi ${MAX_ROWS_PER_BOOK} baris`);
-  if (!rows.every(predicate)) throw new Error(`Data ${label} tidak valid`);
+  if (!Array.isArray(rows)) throw new PayloadError(`Data ${label} tidak valid`);
+  if (rows.length > MAX_ROWS_PER_BOOK) throw new PayloadError(`${label} melebihi ${MAX_ROWS_PER_BOOK} baris`);
+  if (!rows.every(predicate)) throw new PayloadError(`Data ${label} tidak valid`);
   return rows;
 };
 
 const validateGroup = (group, label) => {
-  if (!Array.isArray(group)) throw new Error(`Data ${label} tidak valid`);
-  if (group.length > MAX_BOOKS_PER_GROUP) throw new Error(`${label} melebihi ${MAX_BOOKS_PER_GROUP} buku`);
+  if (!Array.isArray(group)) throw new PayloadError(`Data ${label} tidak valid`);
+  if (group.length > MAX_BOOKS_PER_GROUP) throw new PayloadError(`${label} melebihi ${MAX_BOOKS_PER_GROUP} buku`);
   return group;
 };
 
@@ -571,6 +604,13 @@ const buildBukuWorkbook = (workbook, templateWorkbook, buku, profil, periodeText
   }
 };
 
+// The platform parses application/json for us, but a body that arrives as raw
+// text should still be understood rather than reported as invalid personel data.
+const readBody = (raw) => {
+  if (typeof raw !== 'string') return raw && typeof raw === 'object' ? raw : {};
+  try { return JSON.parse(raw); } catch { return {}; }
+};
+
 module.exports = async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method !== 'POST') {
@@ -578,6 +618,7 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ success: false, message: 'Method not allowed' });
   }
 
+  req.body = readBody(req.body);
   const workers = req.body?.workers;
   const buku = req.body?.buku && typeof req.body.buku === 'object' ? req.body.buku : null;
   const filename = typeof req.body?.filename === 'string' && /^[\w.-]{1,80}$/.test(req.body.filename)
@@ -610,14 +651,7 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    // MASTER_4 is read purely as a style source and never re-serialized: ExcelJS
-    // models only a subset of OOXML, so writing that workbook back out drops its
-    // pivot caches, external links, comments and all but a handful of its 243
-    // defined names, which makes Excel report the download as corrupt and
-    // "repair" it. Emitting a fresh workbook that only holds the generated
-    // sheets keeps the layout identical with nothing to repair.
-    const templateWorkbook = new ExcelJS.Workbook();
-    await templateWorkbook.xlsx.readFile(TEMPLATE_PATH);
+    const templateWorkbook = await loadTemplate();
 
     const workbook = new ExcelJS.Workbook();
     workbook.calcProperties.fullCalcOnLoad = true;
@@ -646,9 +680,9 @@ module.exports = async function handler(req, res) {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error('Workbook generation failed:', message);
-    // Validation errors carry a message meant for the operator; anything else is
-    // an internal fault and stays generic.
-    if (/tidak valid|melebihi/.test(message)) {
+    // A PayloadError says what the operator can fix; anything else is an
+    // internal fault whose detail stays in the log, not in the response.
+    if (error instanceof PayloadError) {
       return res.status(400).json({ success: false, message });
     }
     return res.status(500).json({ success: false, message: 'Gagal membuat workbook' });
