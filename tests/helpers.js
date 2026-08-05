@@ -107,6 +107,11 @@ const baseDB = (overrides = {}) => ({
   },
   coa: KAS_COA.map((c) => ({ ...c })),
   pemasok: [], pembelian: [], approvals: [], batch: [], nominatif: [],
+  barang: [
+    { kode: 'KH', nama: 'KARBOHIDRAT', satuan: '', level: 1 },
+    { kode: 'KH.01', nama: 'BERAS DAN OLAHAN PADI', satuan: '', level: 2 },
+    { kode: 'KH.01.001', nama: 'Beras putih (premium)', satuan: 'kg', level: 3 },
+  ],
   anggaran: { periode: 'Agustus 2026', mulai: '2026-08-01', selesai: '2026-08-31', bahanMakanan: 0, operasional: 0, insentifFasilitas: 0 },
   transaksi: [],
   ...overrides,
