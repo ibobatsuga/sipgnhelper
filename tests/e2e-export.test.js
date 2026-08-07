@@ -169,7 +169,11 @@ test('the app downloads a real workbook without anyone ticked', { skip: availabl
   assert.deepEqual(pageErrors, []);
 });
 
-test('the biweekly button exports the half period it names', { skip: available ? false : 'Chromium or playwright unavailable' }, async (t) => {
+// The buttons no longer name a period; the two dropdowns beside them decide it.
+// So the dropdowns are driven the way an operator drives them — selectOption on
+// the real <select>, which fires the app's own onchange — and the downloaded
+// workbook has to match what was picked.
+test('the export follows the dropdown selection, not the button label', { skip: available ? false : 'Chromium or playwright unavailable' }, async (t) => {
   const { chromium } = require('playwright');
   const { server, port } = await startServer();
   const browser = await chromium.launch({ executablePath: CHROME });
@@ -180,31 +184,70 @@ test('the biweekly button exports the half period it names', { skip: available ?
   await page.waitForFunction(() => typeof renderBuku === 'function');
   await page.evaluate(seedApp);
   await page.evaluate(() => {
-    bukuParuhIndex = 1; // 16–31 Agustus
-    const host = document.createElement('div');
-    host.id = 'e2e';
-    host.innerHTML = renderBuku();
-    document.body.appendChild(host);
+    // Two months of Anggaran, so the Periode dropdown has a real choice to make.
+    DB.anggaran = { periode: 'Agustus 2026', mulai: '2026-08-01', selesai: '2026-09-30', bahanMakanan: 0, operasional: 0, insentifFasilitas: 0 };
+    DB.transaksi.push({
+      id: 't9', tanggal: '2026-09-04', noBukti: 'S-1', uraian: 'Belanja September',
+      akunKas: '1100', akunLawan: '2010', tipe: 'K', jumlah: 700000, approvalStatus: 'approved',
+    });
+    activeTab = 'buku';
+    render();
+    // Supabase's CDN script cannot load here, so the app stays behind its login
+    // gate. The screen itself is fully rendered underneath; reveal it so the
+    // dropdowns can be operated exactly as an operator would.
+    document.getElementById('authScreen').style.display = 'none';
+    // The stylesheet keeps .app-layout at display:none until sign-in, so the
+    // inline value has to name the layout it normally uses.
+    document.querySelector('.app-layout').style.display = 'flex';
   });
 
-  const biweekly = page.locator('#e2e button', { hasText: 'Unduh Buku Biweekly' });
-  assert.match((await biweekly.textContent()).trim(), /16–31 Agustus 2026/);
+  const periode = page.locator('select').filter({ hasText: 'Agustus 2026' }).first();
+  const paruh = page.locator('select').filter({ hasText: '–' }).last();
+  const bulanan = page.locator('button', { hasText: 'Unduh Buku Bulanan' });
+  const biweekly = page.locator('button', { hasText: 'Unduh Buku Biweekly' });
 
-  const [download] = await Promise.all([
-    page.waitForEvent('download', { timeout: 30000 }),
-    biweekly.click(),
-  ]);
-  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'sipgn-e2e-')), download.suggestedFilename());
-  await download.saveAs(file);
+  // The labels stay plain now that the dropdowns carry the period.
+  assert.equal((await bulanan.textContent()).trim(), 'Unduh Buku Bulanan');
+  assert.equal((await biweekly.textContent()).trim(), 'Unduh Buku Biweekly');
 
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.readFile(file);
-  const catatan = workbook.getWorksheet('Catatan');
-  assert.equal(catatan.getCell('C23').value.toISOString().slice(0, 10), '2026-08-16');
-  assert.equal(catatan.getCell('C38').value.toISOString().slice(0, 10), '2026-08-31');
+  const unduh = async (locator) => {
+    const [download] = await Promise.all([
+      page.waitForEvent('download', { timeout: 30000 }),
+      locator.click(),
+    ]);
+    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'sipgn-e2e-')), download.suggestedFilename());
+    await download.saveAs(file);
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(file);
+    return workbook;
+  };
+  const rentangCatatan = (workbook) => {
+    const sheet = workbook.getWorksheet('Catatan');
+    const dates = [];
+    for (let row = 23; row < 23 + 40; row += 1) {
+      const value = sheet.getCell(`C${row}`).value;
+      if (value instanceof Date) dates.push(value.toISOString().slice(0, 10));
+    }
+    return [dates[0], dates[dates.length - 1]];
+  };
 
-  const bku = workbook.getWorksheet('BKU');
-  // The half opens on what the first half closed with: 1.5jt + 25jt - 3.2jt.
-  assert.equal(bku.getCell('I10').value, 23300000);
-  assert.equal(bku.getCell('F16').value, 'Gas dan air');
+  // Second half of August.
+  await paruh.selectOption('1');
+  assert.deepEqual(rentangCatatan(await unduh(biweekly)), ['2026-08-16', '2026-08-31']);
+
+  // Back to the first half — same button, different dropdown.
+  await paruh.selectOption('0');
+  assert.deepEqual(rentangCatatan(await unduh(biweekly)), ['2026-08-01', '2026-08-15']);
+
+  // August as a whole month.
+  assert.deepEqual(rentangCatatan(await unduh(bulanan)), ['2026-08-01', '2026-08-31']);
+
+  // Switching the Periode dropdown moves both buttons to September.
+  await periode.selectOption('1');
+  const september = await unduh(bulanan);
+  assert.deepEqual(rentangCatatan(september), ['2026-09-01', '2026-09-30']);
+  assert.equal(september.getWorksheet('BKU').getCell('F16').value, 'Belanja September');
+
+  // The Paruh dropdown re-populated for September, and the biweekly export follows.
+  assert.deepEqual(rentangCatatan(await unduh(biweekly)), ['2026-09-01', '2026-09-15']);
 });

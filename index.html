@@ -3345,10 +3345,10 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
     <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:8px;">
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
         <button class="btn btn-outline" ${!paruh || biweeklyExportBusy ? 'disabled' : ''} onclick="downloadBukuBiweekly()">
-          ${biweeklyExportBusy ? 'Membuat Workbook…' : `Unduh Buku Biweekly${paruh ? ` (${paruh.label})` : ''}`}
+          ${biweeklyExportBusy ? 'Membuat Workbook…' : 'Unduh Buku Biweekly'}
         </button>
         <button class="btn btn-gold" ${nominatifExportBusy ? 'disabled' : ''} onclick="downloadBukuOtomatis()">
-          ${nominatifExportBusy ? 'Membuat Workbook…' : `Unduh Buku Bulanan (${periodeInfo() ? periodeInfo().label : 'periode berjalan'})`}
+          ${nominatifExportBusy ? 'Membuat Workbook…' : 'Unduh Buku Bulanan'}
         </button>
       </div>
       <div style="display:flex;gap:12px;flex-wrap:wrap;">
