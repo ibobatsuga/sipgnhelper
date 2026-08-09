@@ -1487,6 +1487,24 @@ BB.07.099|Bahan minuman pendamping-lainnya|pcs
             .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
+    // esc() is the right tool for text and for value="", but not for a value
+    // dropped into onclick="hapus('...')". That position is decoded twice: the
+    // HTML parser resolves entities first, then the JS parser reads the string
+    // literal — so esc()'s &#39; simply turns back into a quote and closes the
+    // argument early. Anything landing inside such a handler goes through here
+    // instead: \xNN carries no HTML-special character, so it survives the first
+    // pass untouched, and the second pass decodes it back to exactly the
+    // original character. Codes like KH.01.001 therefore still arrive at the
+    // handler verbatim, and a quote can no longer terminate the call.
+    function escJs(value) {
+        return String(value === null || value === undefined ? '' : value)
+            .replace(/[\\'"&<>\r\n\u2028\u2029]/g, (ch) => {
+                const code = ch.charCodeAt(0);
+                return code > 0xff
+                    ? '\\u' + code.toString(16).padStart(4, '0')
+                    : '\\x' + code.toString(16).padStart(2, '0');
+            });
+    }
     function rupiah(n) { n = Number(n) || 0; return 'Rp ' + n.toLocaleString('id-ID'); }
     function fmtDate(d) { if (!d) return '-'; const dt = new Date(d); return dt.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }); }
     function coaByKode(k) { return DB.coa.find(c => c.kode === k); }
@@ -1496,7 +1514,7 @@ BB.07.099|Bahan minuman pendamping-lainnya|pcs
     }
     function pemasokOptions(selId) {
         if (DB.pemasok.length === 0) return '<option value="">(belum ada pemasok)</option>';
-        return DB.pemasok.map(p => `<option value="${p.id}" ${p.id === selId ? 'selected' : ''}>${esc(p.nama)}</option>`).join('');
+        return DB.pemasok.map(p => `<option value="${esc(p.id)}" ${p.id === selId ? 'selected' : ''}>${esc(p.nama)}</option>`).join('');
     }
     function downloadCSV(filename, headers, rows) {
         let csv = headers.join(';') + '\n';
@@ -1963,8 +1981,8 @@ BB.07.099|Bahan minuman pendamping-lainnya|pcs
           <div class="small muted">${fmtDate(a.tanggal)} ${a.jumlah ? '· ' + rupiah(a.jumlah) : ''}</div>
         </div>
         <div class="row-actions">
-          <button class="btn btn-outline btn-sm" onclick="rejectApproval('${a.id}')">Tolak</button>
-          <button class="btn btn-gold btn-sm" onclick="approveApproval('${a.id}')">Setujui</button>
+          <button class="btn btn-outline btn-sm" onclick="rejectApproval('${escJs(a.id)}')">Tolak</button>
+          <button class="btn btn-gold btn-sm" onclick="approveApproval('${escJs(a.id)}')">Setujui</button>
         </div>
       </div>`).join('')}
   </div>
@@ -2068,7 +2086,7 @@ BB.07.099|Bahan minuman pendamping-lainnya|pcs
     <table><thead><tr><th>Kode</th><th>Nama Barang</th><th>Kelompok</th><th>Satuan</th><th></th></tr></thead>
     <tbody>${tampil.map(b => `<tr>
       <td>${esc(b.kode)}</td><td>${esc(b.nama)}</td><td class="small muted">${esc(namaKelompok(b.kode))}</td><td>${esc(b.satuan)}</td>
-      <td><button class="link-btn" onclick="delBarang('${esc(b.kode)}')">hapus</button></td></tr>`).join('')}
+      <td><button class="link-btn" onclick="delBarang('${escJs(b.kode)}')">hapus</button></td></tr>`).join('')}
     </tbody></table>
     ${item.length > tampil.length ? `<p class="small muted">Menampilkan ${tampil.length} dari ${item.length} item — persempit dengan kotak pencarian.</p>` : ''}`}`;
     })()}
@@ -2089,7 +2107,7 @@ BB.07.099|Bahan minuman pendamping-lainnya|pcs
     <table><thead><tr><th>Nama</th><th>Kontak</th><th>Alamat</th><th></th></tr></thead>
     <tbody>
       ${DB.pemasok.map(p => `<tr><td>${esc(p.nama)}</td><td>${esc(p.kontak || '-')}</td><td>${esc(p.alamat || '-')}</td>
-      <td><button class="link-btn" onclick="delPemasok('${p.id}')">hapus</button></td></tr>`).join('')}
+      <td><button class="link-btn" onclick="delPemasok('${escJs(p.id)}')">hapus</button></td></tr>`).join('')}
     </tbody></table>`}
   </div>
   `;
@@ -2242,7 +2260,7 @@ BB.07.099|Bahan minuman pendamping-lainnya|pcs
         <td class="right">${t.tipe === 'D' ? rupiah(t.jumlah) : '-'}</td>
         <td class="right">${t.tipe === 'K' ? rupiah(t.jumlah) : '-'}</td>
         <td>${statusBadge(t)}</td>
-        <td><button class="link-btn" onclick="delTransaksi('${t.id}')">hapus</button></td>
+        <td><button class="link-btn" onclick="delTransaksi('${escJs(t.id)}')">hapus</button></td>
       </tr>`).join('')}
     </tbody></table>`}
   </div>
@@ -2420,9 +2438,9 @@ BB.07.099|Bahan minuman pendamping-lainnya|pcs
           </div>
         </div>
         <div class="row-actions" style="flex-wrap:wrap;">
-          <button class="btn btn-outline btn-sm" onclick="ocrToTransaksi('${o.id}')">Catat Transaksi</button>
-          <button class="btn btn-outline btn-sm" onclick="ocrToPembelian('${o.id}')">Draft Pembelian SIPGN</button>
-          <button class="link-btn" onclick="ocrDelete('${o.id}')">hapus</button>
+          <button class="btn btn-outline btn-sm" onclick="ocrToTransaksi('${escJs(o.id)}')">Catat Transaksi</button>
+          <button class="btn btn-outline btn-sm" onclick="ocrToPembelian('${escJs(o.id)}')">Draft Pembelian SIPGN</button>
+          <button class="link-btn" onclick="ocrDelete('${escJs(o.id)}')">hapus</button>
         </div>
       </div>`;
             }).join('');
@@ -2555,9 +2573,9 @@ BB.07.099|Bahan minuman pendamping-lainnya|pcs
           <td class="right">${rupiah(total)}</td>
           <td>${p.status === 'terkirim' ? '<span class="badge badge-ok">Terkirim</span>' : '<span class="badge badge-warn">Draft</span>'}</td>
           <td class="row-actions">
-            <button class="link-btn" onclick="viewPembelian('${p.id}')">lihat</button>
-            ${p.status === 'draft' ? `<button class="link-btn" onclick="editPembelian('${p.id}')">edit</button>` : ''}
-            <button class="link-btn" onclick="delPembelian('${p.id}')">hapus</button>
+            <button class="link-btn" onclick="viewPembelian('${escJs(p.id)}')">lihat</button>
+            ${p.status === 'draft' ? `<button class="link-btn" onclick="editPembelian('${escJs(p.id)}')">edit</button>` : ''}
+            <button class="link-btn" onclick="delPembelian('${escJs(p.id)}')">hapus</button>
           </td>
         </tr>`;
         }).join('')}
@@ -2844,11 +2862,11 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
       <th class="center"><input type="checkbox" ${allSelected ? 'checked' : ''} onchange="toggleNominatifSelectAll(this.checked, 'Semua')" title="Pilih semua untuk pembukuan"></th>
       <th>Nama</th><th>Departemen</th><th>Pekerjaan</th><th class="right">Hari</th><th class="right">Upah</th><th class="right">BPJS</th><th class="right">Honor PJ</th><th class="right">Total</th><th></th></tr></thead>
     <tbody>${rows.map(n => `<tr>
-      <td class="center"><input type="checkbox" ${nominatifSelected.has(n.id) ? 'checked' : ''} onchange="toggleNominatifSelect('${n.id}')" title="Sertakan di pembukuan"></td>
+      <td class="center"><input type="checkbox" ${nominatifSelected.has(n.id) ? 'checked' : ''} onchange="toggleNominatifSelect('${escJs(n.id)}')" title="Sertakan di pembukuan"></td>
       <td>${esc(n.nama)}</td><td>${esc(n.departemen || '-')}</td><td>${esc(n.pekerjaan)}</td><td class="right">${n.hari}</td>
       <td class="right">${rupiah(n.upah)}</td><td class="right">${rupiah(n.bpjs)}</td><td class="right">${rupiah(n.honorPJ)}</td>
       <td class="right"><b>${rupiah(n.grandTotal)}</b></td>
-      <td><button class="link-btn" onclick="delNominatif('${n.id}')">hapus</button></td></tr>`).join('')}
+      <td><button class="link-btn" onclick="delNominatif('${escJs(n.id)}')">hapus</button></td></tr>`).join('')}
     </tbody></table>
     <div class="flexend" style="margin-top:10px;font-weight:800;color:var(--navy);">Total Semua: ${rupiah(totalSemua)}</div>`}
   </div>
@@ -3369,7 +3387,7 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
     ${tanggalTakTerbaca() > 0 ? `<div class="note" style="margin-top:0;margin-bottom:12px;background:#fef3c7;border-color:#f59e0b;color:#92400e;">
       ${tanggalTakTerbaca()} transaksi punya tanggal yang tidak terbaca (biasanya dari import CSV) sehingga tidak masuk buku periode mana pun. Perbaiki tanggalnya di menu Transaksi sebelum menutup periode.</div>` : ''}
     <p class="sub" style="margin-bottom:18px;">Workbook mengikuti format MASTER_4: BKU, BP Kas, BP Bahan Baku, BP Operasional, BP Fasilitas, BP Pajak, Catatan Pengeluaran, dan Daftar Nominatif (${exportCount} personel) — semuanya berisi transaksi yang sudah disetujui pada rentang di atas.</p>
-    <div class="subtabs">${subs.map(s => `<button class="subtab ${s.id === bukuSubtab ? 'active' : ''}" onclick="setBukuSub('${s.id}')">${s.label}</button>`).join('')}</div>
+    <div class="subtabs">${subs.map(s => `<button class="subtab ${s.id === bukuSubtab ? 'active' : ''}" onclick="setBukuSub('${escJs(s.id)}')">${s.label}</button>`).join('')}</div>
     ${body}
     </div>
   `;
@@ -3391,10 +3409,10 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
         <th class="center"><input type="checkbox" ${allFilteredSelected ? 'checked' : ''} onchange="toggleNominatifSelectAll(this.checked)"></th>
         <th>Nama</th><th>Departemen</th><th>Pekerjaan</th><th class="right">Hari</th><th class="right">Total</th><th></th></tr></thead>
       <tbody>${rows.map(n => `<tr>
-        <td class="center"><input type="checkbox" ${nominatifSelected.has(n.id) ? 'checked' : ''} onchange="toggleNominatifSelect('${n.id}')"></td>
+        <td class="center"><input type="checkbox" ${nominatifSelected.has(n.id) ? 'checked' : ''} onchange="toggleNominatifSelect('${escJs(n.id)}')"></td>
         <td>${esc(n.nama)}</td><td>${esc(n.departemen || '-')}</td><td>${esc(n.pekerjaan)}</td><td class="right">${n.hari}</td>
         <td class="right"><b>${rupiah(n.grandTotal)}</b></td>
-        <td class="right"><button class="btn btn-outline btn-sm" ${slipExportId ? 'disabled' : ''} onclick="downloadSlipGaji('${n.id}')">
+        <td class="right"><button class="btn btn-outline btn-sm" ${slipExportId ? 'disabled' : ''} onclick="downloadSlipGaji('${escJs(n.id)}')">
           ${slipExportId === n.id ? 'Membuat…' : 'Unduh Slip Gaji'}
         </button></td></tr>`).join('')}
       </tbody></table>`}`}
