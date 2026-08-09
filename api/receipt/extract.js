@@ -12,10 +12,19 @@ const RATE_WINDOW_MS = 60_000;
 const RATE_MAX_CALLS = 12;
 const callLog = new Map();
 
+// Only enough timestamps to answer "more than RATE_MAX_CALLS in the window?" are
+// worth keeping. Without this cap a caller that ignores its 429s kept appending,
+// so the array grew for as long as the flood lasted and every rejection
+// re-filtered all of it — the cost of refusing a caller rose with the size of the
+// attack. Holding the newest RATE_MAX_CALLS + 1 keeps that cost flat while a
+// sustained flood still rolls the window forward and stays blocked.
+const RATE_KEEP = RATE_MAX_CALLS + 1;
+
 const rateLimited = (key) => {
   const now = Date.now();
   const recent = (callLog.get(key) || []).filter((at) => now - at < RATE_WINDOW_MS);
   recent.push(now);
+  if (recent.length > RATE_KEEP) recent.splice(0, recent.length - RATE_KEEP);
   callLog.set(key, recent);
   // Old callers are dropped so the map cannot grow without bound.
   if (callLog.size > 500) {

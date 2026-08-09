@@ -927,7 +927,10 @@ const buildBukuWorkbook = (workbook, templateWorkbook, buku, profil, periodeText
     fasilitas: 'BP Fasilitas',
   };
   validateGroup(buku.belanja || [], 'Buku Pembantu').forEach((belanja) => {
-    const templateName = BELANJA_TEMPLATES[belanja.key];
+    // Own properties only: a plain object literal also answers for everything on
+    // Object.prototype, so a key of "constructor" or "toString" would resolve to
+    // a truthy non-name, slip past the skip below and fail deep inside the build.
+    const templateName = Object.hasOwn(BELANJA_TEMPLATES, belanja.key) ? BELANJA_TEMPLATES[belanja.key] : null;
     if (!templateName) return;
     buildBelanjaSheet(workbook, templateFor(templateName), {
       sheetName: sheetFor(templateName),
