@@ -26,7 +26,7 @@ test('the real auth screen requests recovery and accepts a confirmed new passwor
   const page = await browser.newPage();
   t.after(async () => { await browser.close(); });
 
-  await page.goto('file://' + path.join(ROOT, 'index.html'));
+  await page.goto('file://' + path.join(ROOT, 'index.html'), { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => typeof setAuthMode === 'function');
   await page.evaluate(() => {
     window.__recoveryCalls = [];

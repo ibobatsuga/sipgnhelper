@@ -74,7 +74,7 @@ test('no stored text can execute as script on any screen', { skip: available ? f
   page.on('pageerror', (e) => pageErrors.push(String(e)));
   t.after(async () => { await browser.close(); });
 
-  await page.goto('file://' + path.join(ROOT, 'index.html'));
+  await page.goto('file://' + path.join(ROOT, 'index.html'), { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => typeof renderSetup === 'function');
 
   // Four shapes: element injection, attribute break-out of a value="", of an
@@ -106,7 +106,7 @@ test('escaped text is still shown to the operator, not swallowed', { skip: avail
   const page = await browser.newPage();
   t.after(async () => { await browser.close(); });
 
-  await page.goto('file://' + path.join(ROOT, 'index.html'));
+  await page.goto('file://' + path.join(ROOT, 'index.html'), { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => typeof renderSetup === 'function');
 
   // A supplier really can be called "Toko A & B <Pusat>"; escaping must not eat it.

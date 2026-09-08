@@ -98,7 +98,7 @@ test('the real payment screen carries the bank fee through approval', { skip: br
   const page = await browser.newPage();
   t.after(async () => { await browser.close(); });
 
-  await page.goto('file://' + path.join(ROOT, 'index.html'));
+  await page.goto('file://' + path.join(ROOT, 'index.html'), { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => typeof setTab === 'function');
   await page.evaluate(() => {
     showApp();

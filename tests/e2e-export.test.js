@@ -88,7 +88,7 @@ test('the app downloads a real workbook without anyone ticked', { skip: availabl
 
   t.after(async () => { await browser.close(); server.close(); });
 
-  await page.goto(`http://127.0.0.1:${port}/`);
+  await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => typeof renderBuku === 'function');
   await page.evaluate(seedApp);
 
@@ -180,7 +180,7 @@ test('the export follows the dropdown selection, not the button label', { skip: 
   const page = await browser.newPage();
   t.after(async () => { await browser.close(); server.close(); });
 
-  await page.goto(`http://127.0.0.1:${port}/`);
+  await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => typeof renderBuku === 'function');
   await page.evaluate(seedApp);
   await page.evaluate(() => {

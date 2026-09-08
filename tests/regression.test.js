@@ -139,7 +139,7 @@ test('an id field cannot break out of the attribute it is rendered into', { skip
   const page = await browser.newPage();
   t.after(async () => { await browser.close(); });
 
-  await page.goto('file://' + path.join(ROOT, 'index.html'));
+  await page.goto('file://' + path.join(ROOT, 'index.html'), { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => typeof renderSetup === 'function');
 
   const payloads = [
@@ -194,7 +194,7 @@ test('a value rendered into an event handler cannot close the call and run code'
   page.on('pageerror', (e) => pageErrors.push(String(e)));
   t.after(async () => { await browser.close(); });
 
-  await page.goto('file://' + path.join(ROOT, 'index.html'));
+  await page.goto('file://' + path.join(ROOT, 'index.html'), { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => typeof renderSetup === 'function');
 
   for (const payload of HANDLER_BREAKOUTS) {
@@ -233,7 +233,7 @@ test('escJs round-trips a value so the handler still receives it verbatim', { sk
   const page = await browser.newPage();
   t.after(async () => { await browser.close(); });
 
-  await page.goto('file://' + path.join(ROOT, 'index.html'));
+  await page.goto('file://' + path.join(ROOT, 'index.html'), { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => typeof escJs === 'function');
 
   // Escaping is only correct if the handler gets the original string back —
@@ -260,7 +260,7 @@ test('a pemasok is still selectable after its id is escaped', { skip: browserAva
   const page = await browser.newPage();
   t.after(async () => { await browser.close(); });
 
-  await page.goto('file://' + path.join(ROOT, 'index.html'));
+  await page.goto('file://' + path.join(ROOT, 'index.html'), { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => typeof renderSetup === 'function');
 
   // Escaping must not break the round trip that actually matters: the option
