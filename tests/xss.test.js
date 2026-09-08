@@ -21,6 +21,32 @@ const SCREENS = [
   'renderKas', 'renderPajak', 'renderBuku', 'renderLaporan', 'renderSetup',
 ];
 
+test('OCR queue escapes sender, item names, and persisted thumbnail text', { skip: available ? false : 'Chromium or playwright unavailable' }, async (t) => {
+  const { chromium } = require('playwright');
+  const browser = await chromium.launch({ executablePath: CHROME });
+  const page = await browser.newPage();
+  t.after(async () => { await browser.close(); });
+
+  await page.goto('file://' + path.join(ROOT, 'index.html'), { waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(() => typeof renderOcrQueueListHtml === 'function');
+  const result = await page.evaluate(() => {
+    window.__pwned = [];
+    const payload = '\"><img src=x onerror="window.__pwned.push(1)">';
+    ocrQueueCache = [{
+      id: 'ocr-1', status: 'baru', submittedBy: payload, tanggalKirim: '2026-09-08', thumb: payload,
+      extracted: { tanggal: '2026-09-08', vendor: 'Toko', total: 1, items: [{ nama: payload, jumlah: 1, harga: 1 }] },
+    }];
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    host.innerHTML = renderOcrQueueListHtml();
+    return { html: host.innerHTML, text: host.textContent };
+  });
+  await page.waitForTimeout(250);
+  assert.equal(await page.evaluate(() => window.__pwned.length), 0);
+  assert.match(result.text, /window.__pwned\.push\(1\)/);
+  assert.doesNotMatch(result.html, /<img src="x"/);
+});
+
 // Poisons every free-text field the app stores, then draws each screen.
 const poisonAndRender = ({ screens, payload }) => {
   window.__pwned = [];

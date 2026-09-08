@@ -2447,11 +2447,11 @@ BB.07.099|Bahan minuman pendamping-lainnya|pcs
                 const total = Number(e.total) || 0;
                 return `<div class="approval-row" style="align-items:flex-start;">
         <div style="display:flex;gap:10px;">
-          ${o.thumb ? `<img src="data:image/jpeg;base64,${o.thumb}" style="width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid var(--line);">` : ''}
+          ${o.thumb ? `<img src="data:image/jpeg;base64,${esc(o.thumb)}" style="width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid var(--line);">` : ''}
           <div>
             <b>${esc(e.vendor || 'Vendor tidak terbaca')}</b> · ${rupiah(total)}
-            <div class="small muted">Dikirim oleh ${o.submittedBy || '-'} · ${fmtDate(o.tanggalKirim)} · struk tgl ${fmtDate(e.tanggal)}</div>
-            <div class="small muted">${(e.items || []).map(i => i.nama + ' x' + i.jumlah).join(', ') || '-'}</div>
+            <div class="small muted">Dikirim oleh ${esc(o.submittedBy || '-')} · ${fmtDate(o.tanggalKirim)} · struk tgl ${fmtDate(e.tanggal)}</div>
+            <div class="small muted">${esc((e.items || []).map(i => i.nama + ' x' + i.jumlah).join(', ') || '-')}</div>
           </div>
         </div>
         <div class="row-actions" style="flex-wrap:wrap;">
@@ -2468,7 +2468,7 @@ BB.07.099|Bahan minuman pendamping-lainnya|pcs
             html += '<hr class="sep"><div class="small muted" style="margin-bottom:6px;"><b>Sudah diproses (10 terbaru):</b></div>';
             html += done.map(o => {
                 const e = o.extracted || {};
-                return `<div class="small muted" style="padding:4px 0;">${fmtDate(o.tanggalKirim)} · ${esc(e.vendor || '-')} · ${rupiah(Number(e.total) || 0)} · oleh ${o.submittedBy || '-'}</div>`;
+                return `<div class="small muted" style="padding:4px 0;">${fmtDate(o.tanggalKirim)} · ${esc(e.vendor || '-')} · ${rupiah(Number(e.total) || 0)} · oleh ${esc(o.submittedBy || '-')}</div>`;
             }).join('');
         }
         return html;
