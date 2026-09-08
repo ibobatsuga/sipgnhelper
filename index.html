@@ -841,16 +841,17 @@
         <div class="brand" style="justify-content:center;margin-bottom:8px;">
           <span class="brand-name">SIPGN</span><span class="brand-dot">.HELPER</span>
         </div>
-        <p class="auth-sub">Masuk untuk mengelola data SPPG Anda sendiri. Setiap akun punya data yang terpisah.</p>
+        <p class="auth-sub" id="authSubtitle">Masuk untuk mengelola data SPPG Anda sendiri. Setiap akun punya data yang terpisah.</p>
         <div class="subtabs" id="authTabs">
           <button class="subtab active" onclick="setAuthMode('login')">Masuk</button>
           <button class="subtab" onclick="setAuthMode('signup')">Daftar SPPG Baru</button>
         </div>
-        <div class="field"><label>Email</label><input id="auth_email" type="email" placeholder="nama@email.com" autocomplete="username"></div>
-        <div class="field"><label>Kata Sandi</label><input id="auth_password" type="password" placeholder="Minimal 6 karakter" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitAuth()"></div>
+        <div class="field" id="authEmailField"><label>Email</label><input id="auth_email" type="email" placeholder="nama@email.com" autocomplete="username"></div>
+        <div class="field" id="authPasswordField"><label id="authPasswordLabel">Kata Sandi</label><input id="auth_password" type="password" placeholder="Minimal 6 karakter" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitAuth()"></div>
+        <div class="field" id="authPasswordConfirmField" style="display:none;"><label>Ulangi Kata Sandi Baru</label><input id="auth_password_confirm" type="password" placeholder="Ketik ulang kata sandi baru" autocomplete="new-password" onkeydown="if(event.key==='Enter')submitAuth()"></div>
         <div id="authError" class="note" style="display:none;"></div>
         <button class="btn btn-primary" style="width:100%;justify-content:center;" id="authSubmitBtn" onclick="submitAuth()">Masuk</button>
-        <p class="auth-foot" id="authFootNote">Belum punya akun? <a href="#" onclick="setAuthMode('signup');return false;">Daftar di sini</a></p>
+        <p class="auth-foot" id="authFootNote"><a href="#" onclick="setAuthMode('forgot');return false;">Lupa Kata Sandi?</a> &nbsp;·&nbsp; Belum punya akun? <a href="#" onclick="setAuthMode('signup');return false;">Daftar di sini</a></p>
       </div>
     </div>
 
@@ -1612,6 +1613,27 @@ BB.07.099|Bahan minuman pendamping-lainnya|pcs
         save('approvals');
     }
     function pendingApprovals() { return DB.approvals.filter(a => a.status === 'pending'); }
+    function transaksiBatchDisetujui(b) {
+        const tanggal = todayStr();
+        const suffix = b.id.slice(-6);
+        const rows = [{
+            id: uid(), tanggal, noBukti: 'BATCH-' + suffix,
+            uraian: (b.jenis === 'upah' ? 'Pembayaran Upah - ' : 'Pembayaran Vendor - ') + b.penerima,
+            akunKas: b.akunKas, akunLawan: b.akunLawan, tipe: 'K', jumlah: b.jumlah,
+            keterangan: 'Jatuh tempo ' + fmtDate(b.jatuhTempo), sumber: 'batch', approvalStatus: 'approved'
+        }];
+        const biayaAdmin = Number(b.biayaAdmin);
+        if (Number.isFinite(biayaAdmin) && biayaAdmin > 0) {
+            rows.push({
+                id: uid(), tanggal, noBukti: 'BATCH-ADM-' + suffix,
+                uraian: 'Biaya Admin Bank/Layanan - ' + b.penerima,
+                akunKas: b.akunKas, akunLawan: '2195', tipe: 'K', jumlah: biayaAdmin,
+                keterangan: 'Biaya transaksi perbankan/layanan pembayaran terkait batch ' + b.penerima,
+                sumber: 'batch', approvalStatus: 'approved'
+            });
+        }
+        return rows;
+    }
     function approveApproval(id) {
         const a = DB.approvals.find(x => x.id === id); if (!a) return;
         if (a.linkedTransaksiId) {
@@ -1623,12 +1645,7 @@ BB.07.099|Bahan minuman pendamping-lainnya|pcs
             const b = DB.batch.find(x => x.id === a.batchId);
             if (b) {
                 b.status = 'approved';
-                DB.transaksi.push({
-                    id: uid(), tanggal: todayStr(), noBukti: 'BATCH-' + b.id.slice(-6),
-                    uraian: (b.jenis === 'upah' ? 'Pembayaran Upah - ' : 'Pembayaran Vendor - ') + b.penerima,
-                    akunKas: b.akunKas, akunLawan: b.akunLawan, tipe: 'K', jumlah: b.jumlah,
-                    keterangan: 'Jatuh tempo ' + fmtDate(b.jatuhTempo), sumber: 'batch', approvalStatus: 'approved'
-                });
+                DB.transaksi.push(...transaksiBatchDisetujui(b));
                 save('transaksi'); save('batch');
             }
         }
@@ -2801,32 +2818,44 @@ Grand Total       : ${rupiah(total + biayaAdmin)}` : ''}</div>
     <div class="grid c4">
       <div class="field"><label>Jenis</label><select id="b_jenis"><option value="vendor">Pembayaran Vendor</option><option value="upah">Upah Sukarelawan</option></select></div>
       <div class="field"><label>Penerima</label><input id="b_penerima" placeholder="Nama vendor / relawan"></div>
-      <div class="field"><label>Jumlah (Rp)</label><input id="b_jumlah" type="number" placeholder="0"></div>
+      <div class="field"><label>Jumlah Pembayaran (Rp)</label><input id="b_jumlah" type="number" min="1" placeholder="0" oninput="refreshBatchTotal()"></div>
+      <div class="field"><label>Biaya Admin Bank/Layanan (Rp)</label><input id="b_biayaAdmin" type="number" min="0" value="0" oninput="refreshBatchTotal()"></div>
       <div class="field"><label>Jatuh Tempo</label><input id="b_jatuhTempo" type="date" value="${todayStr()}"></div>
       <div class="field"><label>Akun Kas</label><select id="b_akunKas">${coaOptions(['Kas'])}</select></div>
-      <div class="field" style="grid-column:span 3;"><label>Akun Biaya</label><select id="b_akunLawan">${coaOptions(['Biaya Bahan Baku', 'Biaya Operasional', 'Biaya Fasilitas'])}</select></div>
+      <div class="field" style="grid-column:span 2;"><label>Akun Biaya</label><select id="b_akunLawan">${coaOptions(['Biaya Bahan Baku', 'Biaya Operasional', 'Biaya Fasilitas'])}</select></div>
     </div>
+    <div class="note">Nilai pembayaran dan biaya admin dicatat terpisah. Total debet rekening: <b id="b_totalDebet">Rp0</b>.</div>
     <button class="btn btn-primary" onclick="ajukanBatch()">Ajukan untuk Approval</button>
   </div>
   <div class="card">
     <h2>Daftar Batch Pembayaran</h2>
     ${batchList.length === 0 ? '<div class="empty">Belum ada batch pembayaran.</div>' : `
-    <table><thead><tr><th>Jatuh Tempo</th><th>Jenis</th><th>Penerima</th><th class="right">Jumlah</th><th>Status</th></tr></thead>
+    <table><thead><tr><th>Jatuh Tempo</th><th>Jenis</th><th>Penerima</th><th class="right">Pembayaran</th><th class="right">Admin</th><th class="right">Total Debet</th><th>Status</th></tr></thead>
     <tbody>${batchList.map(b => `<tr><td>${fmtDate(b.jatuhTempo)}</td><td>${b.jenis === 'upah' ? 'Upah' : 'Vendor'}</td><td>${esc(b.penerima)}</td>
-      <td class="right">${rupiah(b.jumlah)}</td>
+      <td class="right">${rupiah(Number(b.jumlah) || 0)}</td><td class="right">${rupiah(Number(b.biayaAdmin) || 0)}</td><td class="right"><b>${rupiah((Number(b.jumlah) || 0) + (Number(b.biayaAdmin) || 0))}</b></td>
       <td>${b.status === 'approved' ? '<span class="badge badge-ok">Disetujui & Tercatat</span>' : b.status === 'ditolak' ? '<span class="badge badge-bad">Ditolak</span>' : '<span class="badge badge-warn">Menunggu</span>'}</td>
       </tr>`).join('')}</tbody></table>`}
   </div>
   `;
     }
+    function refreshBatchTotal() {
+        const jumlah = Math.max(0, Number(val('b_jumlah')) || 0);
+        const biayaAdmin = Math.max(0, Number(val('b_biayaAdmin')) || 0);
+        const el = document.getElementById('b_totalDebet');
+        if (el) el.textContent = rupiah(jumlah + biayaAdmin);
+    }
     function ajukanBatch() {
-        const jenis = val('b_jenis'), penerima = val('b_penerima'), jumlah = Number(val('b_jumlah')) || 0;
+        const jenis = val('b_jenis'), penerima = val('b_penerima'), jumlah = Number(val('b_jumlah'));
         const jatuhTempo = val('b_jatuhTempo'), akunKas = val('b_akunKas'), akunLawan = val('b_akunLawan');
-        if (!penerima || !jumlah) { toast('Penerima dan jumlah wajib diisi'); return; }
+        const biayaAdminText = val('b_biayaAdmin');
+        const biayaAdmin = biayaAdminText === '' ? 0 : Number(biayaAdminText);
+        if (!penerima || !Number.isFinite(jumlah) || jumlah <= 0) { toast('Penerima dan jumlah wajib diisi'); return; }
+        if (!Number.isFinite(biayaAdmin) || biayaAdmin < 0) { toast('Biaya admin tidak boleh negatif'); return; }
+        const totalDebet = jumlah + biayaAdmin;
         const id = uid();
-        DB.batch.push({ id, jenis, penerima, jumlah, jatuhTempo, akunKas, akunLawan, status: 'menunggu' });
+        DB.batch.push({ id, jenis, penerima, jumlah, biayaAdmin, jatuhTempo, akunKas, akunLawan, status: 'menunggu' });
         save('batch');
-        addApproval('batch', { batchId: id, deskripsi: (jenis === 'upah' ? 'Upah - ' : 'Vendor - ') + penerima, jumlah });
+        addApproval('batch', { batchId: id, deskripsi: (jenis === 'upah' ? 'Upah - ' : 'Vendor - ') + penerima, jumlah: totalDebet });
         render();
         toast('Diajukan — menunggu approval di tab Approval & Digest');
     }
@@ -3588,15 +3617,44 @@ Status Review     : ${s.reviewed ? 'Sudah direview' : 'Belum direview'}</div>
     }
 
     // ---------- auth ----------
+    function authButtonLabel(mode) {
+        if (mode === 'signup') return 'Daftar';
+        if (mode === 'forgot') return 'Kirim Tautan Pemulihan';
+        if (mode === 'reset') return 'Simpan Kata Sandi Baru';
+        return 'Masuk';
+    }
     function setAuthMode(mode) {
+        if (!['login', 'signup', 'forgot', 'reset'].includes(mode)) return;
         authMode = mode;
         document.querySelectorAll('#authTabs .subtab').forEach((btn, i) => {
             btn.classList.toggle('active', (mode === 'login' && i === 0) || (mode === 'signup' && i === 1));
         });
-        document.getElementById('authSubmitBtn').textContent = mode === 'login' ? 'Masuk' : 'Daftar';
-        document.getElementById('authFootNote').innerHTML = mode === 'login'
-            ? 'Belum punya akun? <a href="#" onclick="setAuthMode(\'signup\');return false;">Daftar di sini</a>'
-            : 'Sudah punya akun? <a href="#" onclick="setAuthMode(\'login\');return false;">Masuk di sini</a>';
+        const emailField = document.getElementById('authEmailField');
+        const passwordField = document.getElementById('authPasswordField');
+        const confirmField = document.getElementById('authPasswordConfirmField');
+        const passwordInput = document.getElementById('auth_password');
+        emailField.style.display = mode === 'reset' ? 'none' : 'block';
+        passwordField.style.display = mode === 'forgot' ? 'none' : 'block';
+        confirmField.style.display = mode === 'reset' ? 'block' : 'none';
+        document.getElementById('authPasswordLabel').textContent = mode === 'reset' ? 'Kata Sandi Baru' : 'Kata Sandi';
+        passwordInput.autocomplete = mode === 'login' ? 'current-password' : 'new-password';
+        passwordInput.value = '';
+        document.getElementById('auth_password_confirm').value = '';
+        document.getElementById('authSubmitBtn').textContent = authButtonLabel(mode);
+        const subtitles = {
+            login: 'Masuk untuk mengelola data SPPG Anda sendiri. Setiap akun punya data yang terpisah.',
+            signup: 'Daftarkan akun SPPG baru menggunakan email yang dapat menerima verifikasi.',
+            forgot: 'Masukkan email akun. Jika terdaftar, tautan pemulihan akan dikirim ke email tersebut.',
+            reset: 'Buat kata sandi baru untuk menyelesaikan pemulihan akun.',
+        };
+        document.getElementById('authSubtitle').textContent = subtitles[mode];
+        const footers = {
+            login: '<a href="#" onclick="setAuthMode(\'forgot\');return false;">Lupa Kata Sandi?</a> &nbsp;·&nbsp; Belum punya akun? <a href="#" onclick="setAuthMode(\'signup\');return false;">Daftar di sini</a>',
+            signup: 'Sudah punya akun? <a href="#" onclick="setAuthMode(\'login\');return false;">Masuk di sini</a>',
+            forgot: '<a href="#" onclick="setAuthMode(\'login\');return false;">Kembali ke Masuk</a>',
+            reset: 'Pastikan kedua isian kata sandi baru sama.',
+        };
+        document.getElementById('authFootNote').innerHTML = footers[mode];
         document.getElementById('authError').style.display = 'none';
     }
     function showAuthError(message, tone) {
@@ -3607,17 +3665,54 @@ Status Review     : ${s.reviewed ? 'Sudah direview' : 'Belum direview'}</div>
         el.style.borderColor = tone === 'info' ? '#bae6fd' : '#fecaca';
         el.style.display = 'block';
     }
+    function authRedirectUrl() {
+        if (window.location.protocol === 'file:') return null;
+        return window.location.origin + window.location.pathname;
+    }
+    function authErrorMessage(error) {
+        const message = error && error.message ? error.message : '';
+        if (/failed to fetch|network|load failed/i.test(message)) {
+            return 'Tidak dapat menghubungi layanan akun. Periksa koneksi dan konfigurasi Supabase.';
+        }
+        return message || 'Gagal memproses permintaan';
+    }
     async function submitAuth() {
         if (authBusy) return;
         if (!sb) { showAuthError('Gagal memuat komponen login. Periksa koneksi internet, lalu muat ulang halaman.'); return; }
         const email = val('auth_email');
         const password = document.getElementById('auth_password').value;
-        if (!email || !password) { showAuthError('Email dan kata sandi wajib diisi'); return; }
-        if (password.length < 6) { showAuthError('Kata sandi minimal 6 karakter'); return; }
+        const passwordConfirm = document.getElementById('auth_password_confirm').value;
+        if (authMode === 'forgot') {
+            if (!email) { showAuthError('Email wajib diisi'); return; }
+        } else if (authMode === 'reset') {
+            if (!password) { showAuthError('Kata sandi baru wajib diisi'); return; }
+            if (password.length < 6) { showAuthError('Kata sandi minimal 6 karakter'); return; }
+            if (password !== passwordConfirm) { showAuthError('Konfirmasi kata sandi baru tidak sama'); return; }
+        } else {
+            if (!email || !password) { showAuthError('Email dan kata sandi wajib diisi'); return; }
+            if (password.length < 6) { showAuthError('Kata sandi minimal 6 karakter'); return; }
+        }
         authBusy = true;
         const btn = document.getElementById('authSubmitBtn');
         btn.disabled = true; btn.textContent = 'Memproses…';
         try {
+            if (authMode === 'forgot') {
+                const redirectTo = authRedirectUrl();
+                const options = redirectTo ? { redirectTo } : {};
+                const { error } = await sb.auth.resetPasswordForEmail(email, options);
+                if (error) throw error;
+                showAuthError('Jika email terdaftar, tautan pemulihan telah dikirim. Periksa kotak masuk dan folder spam.', 'info');
+                return;
+            }
+            if (authMode === 'reset') {
+                const { error } = await sb.auth.updateUser({ password });
+                if (error) throw error;
+                await sb.auth.signOut();
+                showAuthScreen();
+                setAuthMode('login');
+                showAuthError('Kata sandi berhasil diperbarui. Silakan masuk dengan kata sandi baru.', 'info');
+                return;
+            }
             const { data, error } = authMode === 'login'
                 ? await sb.auth.signInWithPassword({ email, password })
                 : await sb.auth.signUp({ email, password });
@@ -3629,11 +3724,11 @@ Status Review     : ${s.reviewed ? 'Sudah direview' : 'Belum direview'}</div>
             // A successful login (or a signup that returns an active session)
             // is picked up by onAuthStateChange below.
         } catch (error) {
-            showAuthError(error.message || 'Gagal memproses permintaan');
+            showAuthError(authErrorMessage(error));
         } finally {
             authBusy = false;
             btn.disabled = false;
-            btn.textContent = authMode === 'login' ? 'Masuk' : 'Daftar';
+            btn.textContent = authButtonLabel(authMode);
         }
     }
     async function handleLogout() {
@@ -3673,16 +3768,21 @@ Status Review     : ${s.reviewed ? 'Sudah direview' : 'Belum direview'}</div>
 
     // onAuthStateChange fires immediately with the current session on subscribe,
     // so it doubles as both the initial boot check and the login/logout handler.
+    function handleAuthStateChange(event, session) {
+        if (event === 'PASSWORD_RECOVERY') {
+            setTimeout(() => {
+                currentUser = session && session.user ? session.user : null;
+                showAuthScreen();
+                setAuthMode('reset');
+            }, 0);
+            return;
+        }
+        // Deliberately defer this work: supabase-js invokes the callback while
+        // holding its auth lock, and loadAll() needs to make another Supabase call.
+        setTimeout(() => { applyAuthSession(session); }, 0);
+    }
     if (sb) {
-        sb.auth.onAuthStateChange((event, session) => {
-            // Deliberately not an async callback: supabase-js runs this while holding its
-            // auth lock and pushes our promise onto its pendingInLock queue. Any supabase
-            // call made from inside here (loadAll's select) re-enters _acquireLock, which
-            // awaits that queue's last entry — our own still-pending promise — and
-            // deadlocks, leaving the app rendered with an empty DB. Defer to a macrotask
-            // so the work runs after the lock is released.
-            setTimeout(() => { applyAuthSession(session); }, 0);
-        });
+        sb.auth.onAuthStateChange(handleAuthStateChange);
     } else {
         showAuthError('Gagal memuat komponen login. Periksa koneksi internet, lalu muat ulang halaman.');
     }
