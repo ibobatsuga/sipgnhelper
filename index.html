@@ -3643,7 +3643,7 @@ Status Review     : ${s.reviewed ? 'Sudah direview' : 'Belum direview'}</div>
         document.getElementById('authSubmitBtn').textContent = authButtonLabel(mode);
         const subtitles = {
             login: 'Masuk untuk mengelola data SPPG Anda sendiri. Setiap akun punya data yang terpisah.',
-            signup: 'Daftarkan akun SPPG baru menggunakan email yang dapat menerima verifikasi.',
+            signup: 'Daftarkan akun SPPG baru. Akun langsung aktif dan bisa dipakai saat itu juga.',
             forgot: 'Masukkan email akun. Jika terdaftar, tautan pemulihan akan dikirim ke email tersebut.',
             reset: 'Buat kata sandi baru untuk menyelesaikan pemulihan akun.',
         };
@@ -3718,8 +3718,15 @@ Status Review     : ${s.reviewed ? 'Sudah direview' : 'Belum direview'}</div>
                 : await sb.auth.signUp({ email, password });
             if (error) throw error;
             if (authMode === 'signup' && !data.session) {
-                showAuthError('Akun dibuat. Cek email untuk verifikasi, lalu masuk.', 'info');
-                setAuthMode('login');
+                // Registrations are approved the moment they are created, so the
+                // account already works. Supabase still withholds a session here
+                // whenever email confirmation is switched on for the project, so
+                // sign in directly rather than sending the user off to an inbox.
+                const { error: signInError } = await sb.auth.signInWithPassword({ email, password });
+                if (signInError) {
+                    showAuthError('Akun dibuat dan langsung aktif. Silakan masuk.', 'info');
+                    setAuthMode('login');
+                }
             }
             // A successful login (or a signup that returns an active session)
             // is picked up by onAuthStateChange below.
